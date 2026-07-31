@@ -1,0 +1,6 @@
+{
+  "name": "差旅行程与费用管理",
+  "description": "记录和管理个人与团队的差旅行程及费用，支持多视图日历、分类统计、报告生成与数据导入导出",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

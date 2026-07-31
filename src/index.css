@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap');
+
+:root {
+  --island-bg: #f4f8f3;
+  --island-card-bg: #ffffff;
+  --island-[#52c488]: #52c488;
+  --island-green-dark: #379462;
+  --island-cream: #faf5e8;
+  --island-wood: #544439;
+  --font-island: 'Zen Maru Gothic', 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  font-family: var(--font-island);
+  background-color: #f3f8f4;
+  color: #433932;
+}
+
+/* Animal Crossing Leaf Pattern Background */
+.bg-island-pattern {
+  background-color: #eef7f2;
+  background-image: radial-gradient(#82d8a7 1px, transparent 1px), radial-gradient(#82d8a7 1px, #eef7f2 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+.dark .bg-island-pattern {
+  background-color: #17241e;
+  background-image: radial-gradient(#2f4d3e 1px, transparent 1px), radial-gradient(#2f4d3e 1px, #17241e 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Chunky 3D Island Buttons */
+.btn-island-primary {
+  background-color: #52c488;
+  color: #ffffff;
+  border-bottom: 4px solid #379462;
+  border-radius: 1rem;
+  font-weight: 700;
+  transition: all 0.1s ease;
+}
+.btn-island-primary:hover {
+  background-color: #45b77c;
+}
+.btn-island-primary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+  margin-top: 2px;
+}
+
+.btn-island-secondary {
+  background-color: #f8c844;
+  color: #54411f;
+  border-bottom: 4px solid #cfa11d;
+  border-radius: 1rem;
+  font-weight: 700;
+  transition: all 0.1s ease;
+}
+.btn-island-secondary:hover {
+  background-color: #ebb934;
+}
+.btn-island-secondary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+  margin-top: 2px;
+}
+
+.btn-island-dodo {
+  background-color: #48a9e6;
+  color: #ffffff;
+  border-bottom: 4px solid #297bb1;
+  border-radius: 1rem;
+  font-weight: 700;
+  transition: all 0.1s ease;
+}
+.btn-island-dodo:hover {
+  background-color: #3898d4;
+}
+.btn-island-dodo:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+  margin-top: 2px;
+}
+
+.btn-island-coral {
+  background-color: #f78154;
+  color: #ffffff;
+  border-bottom: 4px solid #cb5325;
+  border-radius: 1rem;
+  font-weight: 700;
+  transition: all 0.1s ease;
+}
+.btn-island-coral:hover {
+  background-color: #e86f40;
+}
+.btn-island-coral:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+  margin-top: 2px;
+}
+
+/* Card Island Container with soft rounded shape & thick border */
+.card-island {
+  border-radius: 1.5rem;
+  border: 3px solid #e3f2e8;
+  box-shadow: 0 8px 20px -4px rgba(50, 100, 70, 0.08);
+}
+
+.dark .card-island {
+  border: 3px solid #25382e;
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+}
