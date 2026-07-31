@@ -33,7 +33,7 @@ export interface CustomCategory {
 }
 
 export interface OcrConfig {
-  provider: 'system_gemini' | 'custom_gemini' | 'baidu_ocr' | 'tencent_ocr' | 'aliyun_ocr';
+  provider: 'local_paddle' | 'system_gemini' | 'custom_gemini' | 'baidu_ocr' | 'tencent_ocr' | 'aliyun_ocr';
   apiKey?: string;
   apiSecret?: string;
 }
@@ -56,6 +56,8 @@ export interface TicketOcrResult {
   status: 'pending' | 'processing' | 'success' | 'error';
   errorMessage?: string;
   isEncryptedPdf?: boolean;
+  providerUsed?: string;
+  providerName?: string;
 }
 
 export interface AppSettings {

@@ -349,6 +349,7 @@ export const DataSettingsView: React.FC = () => {
               }
               className="w-full px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
+              <option value="local_paddle">🚀 本地浏览器 Web-PaddleOCR (纯前端 / 零数据外传)</option>
               <option value="system_gemini">⚡ 系统默认（配置于服务器 .env 的 Gemini API）</option>
               <option value="custom_gemini">🔑 自定义 Gemini 3.6 Flash API Key</option>
               <option value="baidu_ocr">🇨🇳 百度智能云 - 火车票 OCR 接口</option>
@@ -364,11 +365,11 @@ export const DataSettingsView: React.FC = () => {
             <input
               type="password"
               placeholder={
-                ocrForm.provider === 'system_gemini'
-                  ? '系统默认引擎无需填写（留空即可）'
+                ocrForm.provider === 'local_paddle' || ocrForm.provider === 'system_gemini'
+                  ? '本地/系统默认引擎无需 API Key（留空即可）'
                   : '请输入您的 API Key'
               }
-              disabled={ocrForm.provider === 'system_gemini'}
+              disabled={ocrForm.provider === 'local_paddle' || ocrForm.provider === 'system_gemini'}
               value={ocrForm.apiKey || ''}
               onChange={(e) =>
                 setOcrForm((prev) => ({ ...prev, apiKey: e.target.value }))
@@ -384,11 +385,11 @@ export const DataSettingsView: React.FC = () => {
             <input
               type="password"
               placeholder={
-                ocrForm.provider === 'system_gemini' || ocrForm.provider === 'custom_gemini'
+                ocrForm.provider === 'local_paddle' || ocrForm.provider === 'system_gemini' || ocrForm.provider === 'custom_gemini'
                   ? '当前引擎无需 Secret Key'
                   : '请输入 Secret Key'
               }
-              disabled={ocrForm.provider === 'system_gemini' || ocrForm.provider === 'custom_gemini'}
+              disabled={ocrForm.provider === 'local_paddle' || ocrForm.provider === 'system_gemini' || ocrForm.provider === 'custom_gemini'}
               value={ocrForm.apiSecret || ''}
               onChange={(e) =>
                 setOcrForm((prev) => ({ ...prev, apiSecret: e.target.value }))

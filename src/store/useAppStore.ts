@@ -81,7 +81,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   customCategories: [],
   theme: 'light',
   isLoading: true,
-  ocrConfig: { provider: 'system_gemini' },
+  ocrConfig: { provider: 'local_paddle' },
 
   activeTab: 'calendar',
   currentViewMode: 'month',
@@ -105,7 +105,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const expenses = await db.getAllExpenses();
       const customCategories = await db.getAllCustomCategories();
       const storedTheme = await db.getSetting<'light' | 'dark'>('theme', 'light');
-      const storedOcrConfig = await db.getSetting<OcrConfig>('ocrConfig', { provider: 'system_gemini' });
+      const storedOcrConfig = await db.getSetting<OcrConfig>('ocrConfig', { provider: 'local_paddle' });
 
       // Apply theme to document element
       if (storedTheme === 'dark') {

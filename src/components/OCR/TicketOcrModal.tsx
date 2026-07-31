@@ -15,9 +15,10 @@ import {
   ChevronRight,
   Info,
   Check,
+  Cpu,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { processTicketOcr } from '../../utils/ticketOcr';
+import { processTicketOcr, getOcrProviderName } from '../../utils/ticketOcr';
 import { TicketOcrResult, TripItem, TransportType } from '../../types';
 
 interface DraftTrip extends TicketOcrResult {
@@ -50,6 +51,8 @@ export const TicketOcrModal: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!ocrModalOpen) return null;
+
+  const activeProviderName = getOcrProviderName(ocrConfig?.provider);
 
   // Handle file selection (single or batch)
   const handleFiles = async (files: FileList | File[]) => {
@@ -212,13 +215,17 @@ export const TicketOcrModal: React.FC = () => {
                 <Sparkles className="w-6 h-6 stroke-[2.5]" />
               </div>
               <div>
-                <h3 className="font-black text-lg text-[#21633f] dark:text-emerald-300 flex items-center gap-2">
-                  <span>智能票据识别录入</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold border border-emerald-300">
-                    AI OCR 纯前端解析
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-black text-lg text-[#21633f] dark:text-emerald-300">
+                    智能票据识别录入
+                  </h3>
+                  {/* Engine Indicator Badge */}
+                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-200 font-extrabold text-xs border border-indigo-300 dark:border-indigo-700 flex items-center gap-1 shadow-xs">
+                    <Cpu className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>识别引擎：{activeProviderName}</span>
                   </span>
-                </h3>
-                <p className="text-xs font-bold text-[#3d835d] dark:text-slate-400">
+                </div>
+                <p className="text-xs font-bold text-[#3d835d] dark:text-slate-400 mt-0.5">
                   支持电子火车票 PDF、纸质车票照片及机票行程单，自动填充表单
                 </p>
               </div>
@@ -283,13 +290,19 @@ export const TicketOcrModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Processing Banner */}
+            {/* Processing Banner with Active Engine Indicator */}
             {isProcessing && (
-              <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border-2 border-sky-200 dark:border-sky-800 flex items-center gap-3">
-                <RefreshCw className="w-5 h-5 text-sky-600 dark:text-sky-400 animate-spin shrink-0" />
-                <span className="text-sm font-bold text-sky-900 dark:text-sky-200">
-                  {progressText}
-                </span>
+              <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border-2 border-indigo-200 dark:border-indigo-800 flex items-center gap-3.5 shadow-sm">
+                <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-spin shrink-0" />
+                <div className="flex-1">
+                  <div className="text-xs font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                    <Cpu className="w-4 h-4" />
+                    <span>正在调用【{activeProviderName}】进行图像与票据字段扫描...</span>
+                  </div>
+                  <p className="text-xs font-bold text-indigo-900/80 dark:text-indigo-200 mt-0.5">
+                    {progressText}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -340,11 +353,16 @@ export const TicketOcrModal: React.FC = () => {
                     >
                       {/* Card Top Header */}
                       <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
                           <FileText className="w-4 h-4 text-[#52c488] shrink-0" />
-                          <span className="font-extrabold text-xs text-[#3b322a] dark:text-slate-200 truncate">
+                          <span className="font-extrabold text-xs text-[#3b322a] dark:text-slate-200 truncate max-w-[160px] sm:max-w-[240px]">
                             {draft.fileName}
                           </span>
+                          {/* Engine Indicator on Card */}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            引擎: {draft.providerName || activeProviderName}
+                          </span>
+
                           {draft.status === 'success' && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center gap-1 border border-emerald-300">
                               <CheckCircle2 className="w-3 h-3" />

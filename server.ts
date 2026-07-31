@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 
@@ -33,16 +32,93 @@ async function startServer() {
   // OCR Ticket Endpoint
   app.post('/api/ocr-ticket', async (req, res) => {
     try {
-      const { imageBase64, mimeType = 'image/jpeg', customApiKey } = req.body;
+      const { imageBase64, mimeType = 'image/jpeg', ocrConfig, customApiKey } = req.body;
 
       if (!imageBase64) {
         return res.status(400).json({ error: '请提供有效的图片或 PDF 图像 Base64 数据' });
       }
 
-      // Use user provided custom API Key if specified, else fallback to server default key
-      const clientAi = customApiKey
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      const provider = ocrConfig?.provider || 'system_gemini';
+      const apiKey = ocrConfig?.apiKey || customApiKey;
+      const apiSecret = ocrConfig?.apiSecret;
+
+      // 1. If user selected Baidu Cloud OCR and provided API Key + Secret Key
+      if (provider === 'baidu_ocr' && apiKey && apiSecret) {
+        try {
+          // Step A: Get Baidu OAuth Token
+          const tokenUrl = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${encodeURIComponent(
+            apiKey
+          )}&client_secret=${encodeURIComponent(apiSecret)}`;
+          const tokenRes = await fetch(tokenUrl, { method: 'POST' });
+          const tokenData = await tokenRes.json();
+
+          if (!tokenData.access_token) {
+            throw new Error(tokenData.error_description || '百度云 Token 获取失败，请检查 Key/Secret');
+          }
+
+          // Step B: Call Baidu Train Ticket OCR API
+          const ocrUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/train_ticket?access_token=${tokenData.access_token}`;
+          const params = new URLSearchParams();
+          params.append('image', cleanBase64);
+
+          const ocrRes = await fetch(ocrUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          });
+
+          const ocrData = await ocrRes.json();
+          if (ocrData.error_code) {
+            throw new Error(ocrData.error_msg || `百度 OCR 识别失败 (${ocrData.error_code})`);
+          }
+
+          const wr = ocrData.words_result || {};
+          // Helper to normalize Baidu date "2026年08月01日" -> "2026-08-01"
+          let rawDate = wr.date || wr.departure_date || '';
+          let departureDate = '';
+          if (rawDate) {
+            const dateMatch = rawDate.match(/(\d{4})[年.-](\d{1,2})[月.-](\d{1,2})/);
+            if (dateMatch) {
+              departureDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+            }
+          }
+
+          // Parse price "553.5元" -> 553.5
+          let rawPrice = wr.ticket_rates || wr.price || '0';
+          let priceNum = parseFloat(String(rawPrice).replace(/[^\d.]/g, '')) || 0;
+
+          return res.json({
+            isValidTicket: true,
+            trainNumber: wr.train_num || wr.ticket_num || '',
+            transportType: '火车',
+            origin: wr.start_station || '',
+            destination: wr.destination_station || '',
+            departureDate,
+            departureTime: wr.time || wr.departure_time || '',
+            price: priceNum,
+            seatInfo: wr.seat_category || wr.seat_num || '',
+            confidenceScores: {
+              trainNumber: 0.95,
+              origin: 0.95,
+              destination: 0.95,
+              departureDate: 0.9,
+              departureTime: 0.85,
+              price: 0.95,
+              seatInfo: 0.85,
+            },
+            providerUsed: 'baidu_ocr',
+          });
+        } catch (baiduErr: any) {
+          console.warn('Baidu OCR error, falling back to Gemini AI:', baiduErr.message);
+          // If Baidu fails, we fall through to Gemini AI vision so the user request isn't blocked
+        }
+      }
+
+      // 2. Default or Custom Gemini AI Vision Processing
+      const clientAi = (provider === 'custom_gemini' && apiKey)
         ? new GoogleGenAI({
-            apiKey: customApiKey,
+            apiKey: apiKey,
             httpOptions: {
               headers: {
                 'User-Agent': 'aistudio-build',
@@ -53,11 +129,9 @@ async function startServer() {
 
       if (!clientAi) {
         return res.status(500).json({
-          error: '服务端未配置 GEMINI_API_KEY，且未提供自定义 API Key。请在系统设置中配置 OCR 服务密钥。',
+          error: '服务端未配置 GEMINI_API_KEY，且未提供有效的 API Key。请在系统设置中配置 OCR 服务密钥。',
         });
       }
-
-      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
       const promptText = `请识别这张火车票/电子客票行程单/机票/大巴票图片上的基本信息，并输出结构化 JSON 数据。
 需求字段规范：
@@ -124,6 +198,8 @@ async function startServer() {
         parsedData = { isValidTicket: false };
       }
 
+      parsedData.providerUsed = provider === 'custom_gemini' ? 'custom_gemini' : 'system_gemini';
+
       return res.json(parsedData);
     } catch (err: any) {
       console.error('OCR Ticket processing error:', err);
@@ -135,6 +211,7 @@ async function startServer() {
 
   // Vite middleware for dev / static for prod
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
