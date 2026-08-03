@@ -170,9 +170,9 @@ export const ItemListView: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {combinedList.map((item) => (
+            {combinedList.map((item, index) => (
               <div
-                key={`${item.itemType}-${item.id}`}
+                key={`${item.itemType}-${item.id}-${index}`}
                 className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-4 transition-all"
               >
                 <div className="flex items-center gap-3.5 min-w-0 flex-1">

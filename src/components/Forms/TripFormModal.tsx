@@ -169,8 +169,8 @@ export const TripFormModal: React.FC = () => {
                   {...register('transport')}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-sm"
                 >
-                  {transportOptions.map((opt) => (
-                    <option key={opt.id} value={opt.name}>
+                  {transportOptions.map((opt, idx) => (
+                    <option key={`topt-${opt.id}-${idx}`} value={opt.name}>
                       {opt.name}
                     </option>
                   ))}

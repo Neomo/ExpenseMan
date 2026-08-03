@@ -36,7 +36,7 @@ export const MonthView: React.FC = () => {
       {/* Weekday Header */}
       <div className="grid grid-cols-7 border-b-2 border-[#d0eedb] dark:border-slate-800 bg-[#faf5e8] dark:bg-slate-800/80 text-center py-3 text-xs font-black text-[#69533f] dark:text-slate-300">
         {WEEKDAYS.map((day, idx) => (
-          <div key={day} className={idx >= 5 ? 'text-[#e85a4f] dark:text-rose-400 font-extrabold' : ''}>
+          <div key={`mwd-${idx}-${day}`} className={idx >= 5 ? 'text-[#e85a4f] dark:text-rose-400 font-extrabold' : ''}>
             {day}
           </div>
         ))}
@@ -44,7 +44,7 @@ export const MonthView: React.FC = () => {
 
       {/* Days Grid */}
       <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-[#eaf4ed] dark:divide-slate-800/80">
-        {daysGrid.map((cell) => {
+        {daysGrid.map((cell, idx) => {
           const dayTrips = tripsByDate[cell.dateStr] || [];
           const dayExpenses = expensesByDate[cell.dateStr] || [];
 
@@ -65,7 +65,7 @@ export const MonthView: React.FC = () => {
 
           return (
             <div
-              key={cell.dateStr}
+              key={`month-cell-${cell.dateStr}-${idx}`}
               id={`month-cell-${cell.dateStr}`}
               onClick={() => setSelectedDate(cell.dateStr)}
               onDoubleClick={() => openDateDetail(cell.dateStr)}
@@ -108,7 +108,7 @@ export const MonthView: React.FC = () => {
               <div className="my-1 space-y-1 overflow-hidden">
                 {destinations.slice(0, 2).map((dest, i) => (
                   <div
-                    key={i}
+                    key={`dest-${cell.dateStr}-${i}-${dest}`}
                     className="flex items-center gap-1 text-[9px] font-bold tracking-tight px-1.5 py-0.5 rounded-lg bg-[#e3f6ec] text-[#2f8859] dark:bg-emerald-950/80 dark:text-emerald-300 border border-[#a2e0bd] dark:border-emerald-900/60 truncate"
                     title={dest}
                   >

@@ -183,9 +183,9 @@ export const DataSettingsView: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {transportCategories.map((c) => (
+              {transportCategories.map((c, idx) => (
                 <div
-                  key={c.id}
+                  key={`tcat-${c.id}-${idx}`}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium flex items-center gap-2"
                 >
                   <span>{c.name}</span>
@@ -220,9 +220,9 @@ export const DataSettingsView: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {expenseCategories.map((c) => (
+              {expenseCategories.map((c, idx) => (
                 <div
-                  key={c.id}
+                  key={`ecat-${c.id}-${idx}`}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium flex items-center gap-2"
                 >
                   <span>{c.name}</span>

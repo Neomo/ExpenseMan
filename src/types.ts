@@ -58,6 +58,9 @@ export interface TicketOcrResult {
   isEncryptedPdf?: boolean;
   providerUsed?: string;
   providerName?: string;
+  pdfTextLines?: string[];
+  convertedImageResolution?: string;
+  processingSteps?: { stepName: string; status: 'done' | 'processing' | 'failed'; detail?: string }[];
 }
 
 export interface AppSettings {

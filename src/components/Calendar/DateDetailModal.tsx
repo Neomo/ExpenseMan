@@ -120,9 +120,9 @@ export const DateDetailModal: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {dayTrips.map((t) => (
+                    {dayTrips.map((t, idx) => (
                       <div
-                        key={t.id}
+                        key={`mdtrip-${t.id}-${idx}`}
                         className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-blue-300 dark:hover:border-blue-700 transition-all flex items-center justify-between gap-3"
                       >
                         <div className="space-y-1 min-w-0 flex-1">
@@ -208,9 +208,9 @@ export const DateDetailModal: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {dayExpenses.map((e) => (
+                    {dayExpenses.map((e, idx) => (
                       <div
-                        key={e.id}
+                        key={`mdexp-${e.id}-${idx}`}
                         className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all flex items-center justify-between gap-3"
                       >
                         <div className="space-y-1 min-w-0 flex-1">

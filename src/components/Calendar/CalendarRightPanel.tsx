@@ -125,9 +125,9 @@ export const CalendarRightPanel: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {/* Trips List */}
-            {dayTrips.map((t) => (
+            {dayTrips.map((t, idx) => (
               <div
-                key={t.id}
+                key={`crtrip-${t.id}-${idx}`}
                 className="p-3.5 rounded-2xl border-2 border-[#c3e3f7] bg-[#f4f9fd] dark:bg-slate-800/80 dark:border-slate-700 flex items-start justify-between gap-3 shadow-xs hover:border-[#297bb1] transition-all"
               >
                 <div className="flex items-start gap-2.5 min-w-0">
@@ -187,9 +187,9 @@ export const CalendarRightPanel: React.FC = () => {
             ))}
 
             {/* Expenses List */}
-            {dayExpenses.map((e) => (
+            {dayExpenses.map((e, idx) => (
               <div
-                key={e.id}
+                key={`crexp-${e.id}-${idx}`}
                 className="p-3.5 rounded-2xl border-2 border-[#a2e0bd] bg-[#f0faf4] dark:bg-slate-800/80 dark:border-slate-700 flex items-start justify-between gap-3 shadow-xs hover:border-[#52c488] transition-all"
               >
                 <div className="flex items-start gap-2.5 min-w-0">

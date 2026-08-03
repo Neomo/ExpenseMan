@@ -132,8 +132,8 @@ export const ExpenseFormModal: React.FC = () => {
                   {...register('category')}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all text-sm"
                 >
-                  {expenseCategoryOptions.map((opt) => (
-                    <option key={opt.id} value={opt.name}>
+                  {expenseCategoryOptions.map((opt, idx) => (
+                    <option key={`eopt-${opt.id}-${idx}`} value={opt.name}>
                       {opt.name}
                     </option>
                   ))}

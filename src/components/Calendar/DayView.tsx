@@ -89,9 +89,9 @@ export const DayView: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {/* Trips */}
-            {dayTrips.map((t) => (
+            {dayTrips.map((t, idx) => (
               <div
-                key={t.id}
+                key={`dtrip-${t.id}-${idx}`}
                 className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 flex items-center justify-between gap-4 hover:shadow-sm transition-all"
               >
                 <div className="flex items-start gap-3">
@@ -149,9 +149,9 @@ export const DayView: React.FC = () => {
             ))}
 
             {/* Expenses */}
-            {dayExpenses.map((e) => (
+            {dayExpenses.map((e, idx) => (
               <div
-                key={e.id}
+                key={`dexp-${e.id}-${idx}`}
                 className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 flex items-center justify-between gap-4 hover:shadow-sm transition-all"
               >
                 <div className="flex items-start gap-3">

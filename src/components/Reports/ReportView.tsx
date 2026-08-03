@@ -509,8 +509,8 @@ export const ReportView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                    {filteredTrips.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    {filteredTrips.map((t, idx) => (
+                      <tr key={`report-trip-${t.id}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                         <td className="py-2.5 px-3 font-medium">{t.date}</td>
                         <td className="py-2.5 px-3">
                           <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-medium">
@@ -563,8 +563,8 @@ export const ReportView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                    {filteredExpenses.map((e) => (
-                      <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    {filteredExpenses.map((e, idx) => (
+                      <tr key={`report-exp-${e.id}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                         <td className="py-2.5 px-3 font-medium">{e.date}</td>
                         <td className="py-2.5 px-3">
                           <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-medium">

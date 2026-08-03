@@ -33,7 +33,7 @@ export const WeekView: React.FC = () => {
 
         return (
           <div
-            key={cell.dateStr}
+            key={`week-cell-${cell.dateStr}-${idx}`}
             id={`week-col-${cell.dateStr}`}
             onClick={() => setSelectedDate(cell.dateStr)}
             onDoubleClick={() => openDateDetail(cell.dateStr)}
@@ -75,9 +75,9 @@ export const WeekView: React.FC = () => {
 
             {/* List Preview */}
             <div className="space-y-2 flex-1 my-1 min-h-[140px] overflow-y-auto">
-              {dayTrips.map((t) => (
+              {dayTrips.map((t, tIdx) => (
                 <div
-                  key={t.id}
+                  key={`wtrip-${t.id}-${tIdx}`}
                   className="p-2 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-xs space-y-1"
                 >
                   <div className="flex items-center justify-between font-medium text-blue-900 dark:text-blue-200">
@@ -95,9 +95,9 @@ export const WeekView: React.FC = () => {
                 </div>
               ))}
 
-              {dayExpenses.map((e) => (
+              {dayExpenses.map((e, eIdx) => (
                 <div
-                  key={e.id}
+                  key={`wexp-${e.id}-${eIdx}`}
                   className="p-2 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 text-xs space-y-1"
                 >
                   <div className="flex items-center justify-between font-medium text-emerald-900 dark:text-emerald-200">
