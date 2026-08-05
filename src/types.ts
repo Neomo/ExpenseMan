@@ -114,6 +114,19 @@ export interface DraftTrip extends TicketOcrResult {
   isDuplicate?: boolean;
 }
 
+export interface TripChain {
+  id: string;
+  title: string; // e.g. "汉口往返环线"
+  startCity: string; // e.g. "汉口"
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  legs: TripItem[];
+  cities: string[]; // e.g. ["汉口", "随州南", "十堰东", "汉口"]
+  totalCost: number;
+  totalDays: number;
+  themeIndex: number;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   currencySymbol: string;

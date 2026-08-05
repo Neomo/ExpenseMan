@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { getMonthDaysGrid } from '../../utils/dateUtils';
-import { Plane, Receipt, MapPin, Plus } from 'lucide-react';
+import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
+import { Plane, Receipt, MapPin, Plus, Repeat } from 'lucide-react';
 
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -17,6 +18,9 @@ export const MonthView: React.FC = () => {
   } = useAppStore();
 
   const daysGrid = getMonthDaysGrid(calendarFocusDate);
+
+  // Analyze all complete round-trip chains
+  const allChains = useMemo(() => analyzeTripChains(trips), [trips]);
 
   // Helper maps for quick lookup per date string
   const tripsByDate = trips.reduce((acc, t) => {
@@ -63,16 +67,22 @@ export const MonthView: React.FC = () => {
 
           const isSelected = selectedDate === cell.dateStr;
 
+          // Check if this date belongs to a complete trip chain
+          const chain = getChainForDate(allChains, cell.dateStr);
+          const theme = chain ? CHAIN_THEMES[chain.themeIndex % CHAIN_THEMES.length] : null;
+
           return (
             <div
               key={`month-cell-${cell.dateStr}-${idx}`}
               id={`month-cell-${cell.dateStr}`}
               onClick={() => setSelectedDate(cell.dateStr)}
               onDoubleClick={() => openDateDetail(cell.dateStr)}
-              className={`min-h-[85px] sm:min-h-[100px] md:min-h-[110px] xl:min-h-[120px] 2xl:min-h-[135px] p-2 flex flex-col justify-between cursor-pointer group transition-all relative rounded-xl border border-transparent ${
-                !cell.isCurrentMonth
-                  ? 'bg-[#f8fbf9]/60 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600 opacity-60'
-                  : 'bg-white dark:bg-slate-900 text-[#433932] dark:text-slate-200 hover:bg-[#f0f8f3] dark:hover:bg-slate-800/60'
+              className={`min-h-[90px] sm:min-h-[105px] md:min-h-[115px] xl:min-h-[125px] 2xl:min-h-[140px] p-2 flex flex-col justify-between cursor-pointer group transition-all relative rounded-xl border ${
+                chain
+                  ? `${theme?.bgLight} ${theme?.bgDark} ${theme?.borderLight} ${theme?.borderDark} shadow-xs`
+                  : !cell.isCurrentMonth
+                  ? 'bg-[#f8fbf9]/60 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600 opacity-60 border-transparent'
+                  : 'bg-white dark:bg-slate-900 text-[#433932] dark:text-slate-200 hover:bg-[#f0f8f3] dark:hover:bg-slate-800/60 border-transparent'
               } ${
                 isSelected
                   ? 'ring-3 ring-[#52c488] ring-inset bg-[#e8f7ee] dark:bg-emerald-950/40 shadow-sm'
@@ -105,6 +115,25 @@ export const MonthView: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Complete Trip Chain Badge */}
+              {chain && (
+                <div className="mb-1">
+                  <span
+                    className={`text-[9.5px] font-black px-1.5 py-0.5 rounded-md ${theme?.badgeBg} truncate max-w-full flex items-center gap-1 shadow-2xs`}
+                    title={`${chain.title} (${chain.startDate}~${chain.endDate})`}
+                  >
+                    <Repeat className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate">
+                      {cell.dateStr === chain.startDate
+                        ? `🚀 ${chain.startCity}出发`
+                        : cell.dateStr === chain.endDate
+                        ? `🏁 返还${chain.startCity}`
+                        : `📍 ${chain.startCity}往返中`}
+                    </span>
+                  </span>
+                </div>
+              )}
 
               {/* Day Content Area (Rich Trips & Expenses display) */}
               <div className="my-1 space-y-1.5 flex-1 overflow-hidden">

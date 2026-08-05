@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { CalendarHeader } from './CalendarHeader';
 import { MonthView } from './MonthView';
@@ -6,12 +6,16 @@ import { WeekView } from './WeekView';
 import { DayView } from './DayView';
 import { DateDetailModal } from './DateDetailModal';
 import { CalendarRightPanel } from './CalendarRightPanel';
+import { analyzeTripChains, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, Repeat, ArrowRight, Compass } from 'lucide-react';
 
 export const CalendarView: React.FC = () => {
-  const { currentViewMode, calendarFocusDate, trips, expenses } = useAppStore();
+  const { currentViewMode, calendarFocusDate, trips, expenses, setSelectedDate } = useAppStore();
   const [showTip, setShowTip] = useState(true);
+
+  // Compute all detected complete trip chains
+  const tripChains = useMemo(() => analyzeTripChains(trips), [trips]);
 
   // Auto-hide interaction tip after 3 seconds
   useEffect(() => {
@@ -55,29 +59,50 @@ export const CalendarView: React.FC = () => {
     <div className="space-y-6">
       <CalendarHeader />
 
-      {/* Interactive Guidance Tip (Auto-hides after 3 seconds) */}
-      <AnimatePresence>
-        {showTip && (
-          <motion.div
-            initial={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: 'hidden' }}
-            transition={{ duration: 0.4 }}
-            className="bg-[#faf5e8] dark:bg-slate-800/80 border-2 border-[#eadaa8] dark:border-slate-700 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-2 text-xs font-bold text-[#54411f] dark:text-slate-300 shadow-xs"
-          >
-            <span className="flex items-center gap-1.5">
-              <span>💡</span>
-              <span>交互提示：<b>单击</b>日期即可在右侧面板预览该日行程与费用；<b>双击</b>日期弹窗全屏详情。</span>
+      {/* Smart Round-Trip Chain Analysis Banner */}
+      {tripChains.length > 0 && (
+        <div className="p-4 bg-gradient-to-r from-[#eef9f2] via-[#f0f4ff] to-[#fef7eb] dark:from-emerald-950/40 dark:via-indigo-950/40 dark:to-amber-950/40 border-2 border-[#b5e2c8] dark:border-slate-700 rounded-3xl shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-xl bg-[#52c488] text-white text-xs font-black shadow-xs flex items-center gap-1">
+                <Repeat className="w-3.5 h-3.5" />
+                <span>智能闭环解析</span>
+              </span>
+              <h3 className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                已自动识别 <span className="text-[#3cae74] dark:text-emerald-400 font-mono text-sm font-black">{tripChains.length}</span> 组从出发地又返回出发地的完整出差行程 (日历格已按同色相连高亮)
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-500 font-bold">
+              💡 点击路线标签可聚焦至首日日历
             </span>
-            <button
-              onClick={() => setShowTip(false)}
-              className="p-1 text-[#8e8071] hover:text-[#54411f] dark:hover:text-slate-100 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              title="关闭提示"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          <div className="flex flex-wrap gap-2.5">
+            {tripChains.map((chain) => {
+              const theme = CHAIN_THEMES[chain.themeIndex % CHAIN_THEMES.length];
+              return (
+                <button
+                  key={`chain-banner-${chain.id}`}
+                  onClick={() => setSelectedDate(chain.startDate)}
+                  className={`px-3 py-2 rounded-2xl border ${theme.borderLight} ${theme.borderDark} ${theme.bgLight} ${theme.bgDark} hover:scale-[1.01] transition-all flex items-center gap-2 text-xs font-bold shadow-2xs group`}
+                  title="点击在日历中高亮定位此完整行程"
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${theme.dotColor} shrink-0 group-hover:animate-ping`} />
+                  <span className={`${theme.badgeText} font-black flex items-center gap-1`}>
+                    <span>{chain.startCity}往返闭环</span>
+                    <span className="text-[10px] opacity-80">
+                      ({chain.cities.join(' ➔ ')})
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+                    {chain.startDate} ~ {chain.endDate} ({chain.totalDays}天)
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid with Calendar on Left (Expanded for Widescreen) and Details Side Panel on Right */}
       <div className="grid grid-cols-1 xl:grid-cols-12 2xl:grid-cols-12 gap-6 items-start">

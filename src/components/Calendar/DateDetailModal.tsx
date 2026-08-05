@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -11,9 +11,11 @@ import {
   Edit2,
   Calendar as CalendarIcon,
   DollarSign,
+  Repeat,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { formatChineseDate } from '../../utils/dateUtils';
+import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import { TripItem, ExpenseItem } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 
@@ -35,6 +37,10 @@ export const DateDetailModal: React.FC = () => {
     id: string;
     title: string;
   } | null>(null);
+
+  const allChains = useMemo(() => analyzeTripChains(trips), [trips]);
+  const activeChain = useMemo(() => getChainForDate(allChains, selectedDate), [allChains, selectedDate]);
+  const activeTheme = activeChain ? CHAIN_THEMES[activeChain.themeIndex % CHAIN_THEMES.length] : null;
 
   if (!dateDetailOpen) return null;
 
@@ -95,6 +101,31 @@ export const DateDetailModal: React.FC = () => {
 
             {/* Scrollable Content Body */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Active Trip Chain Banner */}
+              {activeChain && activeTheme && (
+                <div className={`p-4 rounded-2xl border ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-2 shadow-xs`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-black px-2.5 py-0.5 rounded-lg ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
+                      <Repeat className="w-3.5 h-3.5" />
+                      <span>所属完整闭环出差路线</span>
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">
+                      {activeChain.startDate} ~ {activeChain.endDate} ({activeChain.totalDays}天)
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span>{activeChain.cities.join(' ➔ ')}</span>
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 pt-1.5 border-t border-black/5 dark:border-white/10">
+                    <span>全程涵盖 {activeChain.legs.length} 段连贯交通行程</span>
+                    <span className="font-mono text-[#d65129] dark:text-amber-300 font-black text-sm">
+                      闭环总交通费: ¥{activeChain.totalCost.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
               {/* Section 1: Travel Trips */}
               <div>
                 <div className="flex items-center justify-between mb-3">

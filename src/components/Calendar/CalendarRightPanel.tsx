@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { formatChineseDate } from '../../utils/dateUtils';
+import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import {
   Plane,
   Receipt,
@@ -11,6 +12,8 @@ import {
   Trash2,
   CalendarDays,
   Maximize2,
+  Repeat,
+  ArrowRight,
 } from 'lucide-react';
 
 export const CalendarRightPanel: React.FC = () => {
@@ -24,6 +27,10 @@ export const CalendarRightPanel: React.FC = () => {
     deleteTrip,
     deleteExpense,
   } = useAppStore();
+
+  const allChains = useMemo(() => analyzeTripChains(trips), [trips]);
+  const activeChain = useMemo(() => getChainForDate(allChains, selectedDate), [allChains, selectedDate]);
+  const activeTheme = activeChain ? CHAIN_THEMES[activeChain.themeIndex % CHAIN_THEMES.length] : null;
 
   const dayTrips = trips.filter((t) => t.date === selectedDate);
   const dayExpenses = expenses.filter((e) => e.date === selectedDate);
@@ -59,6 +66,32 @@ export const CalendarRightPanel: React.FC = () => {
           <Maximize2 className="w-4 h-4 stroke-[2.5]" />
         </button>
       </div>
+
+      {/* Belonging Round-Trip Chain Alert Card */}
+      {activeChain && activeTheme && (
+        <div className={`p-3 rounded-2xl border ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-1.5 shadow-2xs`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
+              <Repeat className="w-3 h-3" />
+              <span>所属完整闭环出差</span>
+            </span>
+            <span className="text-[10px] font-mono font-bold text-slate-500">
+              {activeChain.startDate} ~ {activeChain.endDate} ({activeChain.totalDays}天)
+            </span>
+          </div>
+
+          <p className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-1 flex-wrap pt-0.5">
+            <span>{activeChain.cities.join(' ➔ ')}</span>
+          </p>
+
+          <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-600 dark:text-slate-400 pt-1 border-t border-black/5 dark:border-white/10">
+            <span>全程包含 {activeChain.legs.length} 段交通</span>
+            <span className="font-mono text-[#d65129] dark:text-amber-300 font-black">
+              闭环交通费: ¥{activeChain.totalCost.toFixed(1)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Daily Cost Summary Cards */}
       <div className="grid grid-cols-3 gap-2">
