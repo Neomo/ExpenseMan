@@ -26,8 +26,9 @@ import {
   FileSearch,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { processTicketOcr, getOcrProviderName } from '../../utils/ticketOcr';
-import { TicketOcrResult, TripItem, TransportType } from '../../types';
+import { processTicketOcr, getOcrProviderName, extractTextInRegionBox, parseFieldFromText, DEFAULT_RAILWAY_TEMPLATE } from '../../utils/ticketOcr';
+import { TicketOcrResult, TripItem, TransportType, TicketTemplateProfile, PdfTextItemWithPos } from '../../types';
+import { TicketRegionEditorModal } from './TicketRegionEditorModal';
 
 interface DraftTrip extends TicketOcrResult {
   // Editable fields for user verification
@@ -50,13 +51,19 @@ export const TicketOcrModal: React.FC = () => {
     batchAddTrips,
     openTripModal,
     showToast,
+    ocrDrafts: drafts,
+    setOcrDrafts: setDrafts,
+    isOcrProcessing: isProcessing,
+    ocrProgressText: progressText,
+    processOcrFiles: handleFiles,
   } = useAppStore();
 
-  const [drafts, setDrafts] = useState<DraftTrip[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progressText, setProgressText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [expandedDetailsId, setExpandedDetailsId] = useState<string | null>(null);
+
+  // Region Coordinate Editor Modal state
+  const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
+  const [activeDraftIndex, setActiveDraftIndex] = useState<number | null>(null);
 
   // Lightbox modal state for viewing high-definition converted intermediate images
   const [previewModal, setPreviewModal] = useState<{
@@ -73,58 +80,47 @@ export const TicketOcrModal: React.FC = () => {
 
   const activeProviderName = getOcrProviderName(ocrConfig?.provider);
 
-  // Handle file selection (single or batch)
-  const handleFiles = async (files: FileList | File[]) => {
-    const validFiles: File[] = [];
-    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png'];
+  const handleOpenRegionEditor = (index: number) => {
+    setActiveDraftIndex(index);
+    setIsRegionModalOpen(true);
+  };
 
-    Array.from(files).forEach((file) => {
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      if (ext && allowedExts.includes(ext)) {
-        validFiles.push(file);
-      }
-    });
+  const handleSaveRegionTemplate = (updatedTemplate: TicketTemplateProfile) => {
+    if (activeDraftIndex === null || !drafts[activeDraftIndex]) return;
 
-    if (validFiles.length === 0) {
-      showToast('仅支持上传 .pdf, .jpg, .jpeg, .png 格式的文件', 'error');
-      return;
-    }
+    const targetDraft = drafts[activeDraftIndex];
+    const itemsPos = targetDraft.pdfTextItemsWithPos || [];
 
-    setIsProcessing(true);
-    setProgressText(`准备识别 ${validFiles.length} 张票据...`);
+    // Extract fields based on new region template box coordinates
+    const newOrigin = parseFieldFromText('origin', extractTextInRegionBox(itemsPos, updatedTemplate.regions.origin));
+    const newDestination = parseFieldFromText('destination', extractTextInRegionBox(itemsPos, updatedTemplate.regions.destination));
+    const newTrain = parseFieldFromText('trainNumber', extractTextInRegionBox(itemsPos, updatedTemplate.regions.trainNumber));
+    const newDate = parseFieldFromText('departureDate', extractTextInRegionBox(itemsPos, updatedTemplate.regions.departureDate));
+    const newTime = parseFieldFromText('departureTime', extractTextInRegionBox(itemsPos, updatedTemplate.regions.departureTime));
+    const newPriceStr = parseFieldFromText('price', extractTextInRegionBox(itemsPos, updatedTemplate.regions.price));
+    const newPrice = parseFloat(newPriceStr) || targetDraft.editedAmount;
+    const newSeat = parseFieldFromText('seatInfo', extractTextInRegionBox(itemsPos, updatedTemplate.regions.seatInfo));
 
-    const newDrafts: DraftTrip[] = [];
+    setDrafts((prev) =>
+      prev.map((d, i) =>
+        i === activeDraftIndex
+          ? {
+              ...d,
+              editedOrigin: newOrigin || d.editedOrigin,
+              editedDestination: newDestination || d.editedDestination,
+              editedTrainNumber: newTrain || d.editedTrainNumber,
+              editedDate: newDate || d.editedDate,
+              editedStartTime: newTime || d.editedStartTime,
+              editedAmount: newPrice || d.editedAmount,
+              editedRemarks: newSeat ? `席别: ${newSeat}` : d.editedRemarks,
+              appliedTemplateName: updatedTemplate.name,
+              appliedTemplateId: updatedTemplate.id,
+            }
+          : d
+      )
+    );
 
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i];
-      setProgressText(`正在处理第 ${i + 1}/${validFiles.length} 张: ${file.name}`);
-
-      const result = await processTicketOcr(file, ocrConfig);
-
-      // Create draft trip state
-      const draft: DraftTrip = {
-        ...result,
-        editedTrainNumber: result.trainNumber || '',
-        editedTransport: result.transportType || '火车',
-        editedOrigin: result.origin || '',
-        editedDestination: result.destination || '',
-        editedDate: result.departureDate || new Date().toISOString().split('T')[0],
-        editedStartTime: result.departureTime || '',
-        editedAmount: result.price || 0,
-        editedRemarks: result.seatInfo ? `席别: ${result.seatInfo}` : '',
-      };
-
-      newDrafts.push(draft);
-    }
-
-    setDrafts((prev) => [...prev, ...newDrafts]);
-    setIsProcessing(false);
-    setProgressText('');
-
-    const successCount = newDrafts.filter((d) => d.status === 'success').length;
-    if (successCount > 0) {
-      showToast(`已完成 ${successCount} 张票据识别`, 'success');
-    }
+    showToast(`已运用【${updatedTemplate.name}】坐标映射重构本张车票字段！`, 'success');
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -382,6 +378,13 @@ export const TicketOcrModal: React.FC = () => {
                             引擎: {draft.providerName || activeProviderName}
                           </span>
 
+                          {draft.appliedTemplateName && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-purple-500" />
+                              <span>{draft.appliedTemplateName}</span>
+                            </span>
+                          )}
+
                           {draft.status === 'success' && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center gap-1 border border-emerald-300">
                               <CheckCircle2 className="w-3 h-3" />
@@ -396,7 +399,16 @@ export const TicketOcrModal: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenRegionEditor(idx)}
+                            className="px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-[#2f8859] dark:text-emerald-300 font-bold text-xs border border-emerald-300/80 dark:border-emerald-800 transition-all flex items-center gap-1 shadow-xs"
+                            title="配置并框选本张车票的关键字段位置坐标"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>📐 框选坐标/校准此车票</span>
+                          </button>
+
                           <button
                             onClick={() => handleRemoveDraft(idx)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-700 transition-colors"
@@ -887,6 +899,21 @@ export const TicketOcrModal: React.FC = () => {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Ticket Region & Position Coordinate Editor Modal */}
+      {isRegionModalOpen && activeDraftIndex !== null && drafts[activeDraftIndex] && (
+        <TicketRegionEditorModal
+          isOpen={isRegionModalOpen}
+          onClose={() => {
+            setIsRegionModalOpen(false);
+            setActiveDraftIndex(null);
+          }}
+          imageSrc={drafts[activeDraftIndex].previewUrl}
+          pdfTextItemsWithPos={drafts[activeDraftIndex].pdfTextItemsWithPos}
+          pdfTextLines={drafts[activeDraftIndex].pdfTextLines}
+          onSaveTemplate={handleSaveRegionTemplate}
+        />
       )}
     </AnimatePresence>
   );

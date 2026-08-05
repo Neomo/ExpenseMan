@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { format } from 'date-fns';
-import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig } from '../types';
+import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip } from '../types';
 import * as db from '../services/db';
+import { processTicketOcr } from '../utils/ticketOcr';
 
 interface AppState {
   // Data State
@@ -11,6 +12,13 @@ interface AppState {
   theme: 'light' | 'dark';
   isLoading: boolean;
   ocrConfig: OcrConfig;
+
+  // Background OCR State
+  ocrDrafts: DraftTrip[];
+  isOcrProcessing: boolean;
+  ocrProgressText: string;
+  ocrTotalFiles: number;
+  ocrCompletedFiles: number;
 
   // View Controls
   activeTab: 'calendar' | 'list' | 'report' | 'settings';
@@ -69,6 +77,9 @@ interface AppState {
   closeOcrModal: () => void;
   saveOcrConfig: (config: OcrConfig) => Promise<void>;
   batchAddTrips: (newTrips: TripItem[]) => Promise<void>;
+  processOcrFiles: (files: FileList | File[]) => Promise<void>;
+  setOcrDrafts: (drafts: DraftTrip[] | ((prev: DraftTrip[]) => DraftTrip[])) => void;
+  clearOcrDrafts: () => void;
 
   // Toast
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -82,6 +93,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: 'light',
   isLoading: true,
   ocrConfig: { provider: 'local_paddle' },
+
+  ocrDrafts: [],
+  isOcrProcessing: false,
+  ocrProgressText: '',
+  ocrTotalFiles: 0,
+  ocrCompletedFiles: 0,
 
   activeTab: 'calendar',
   currentViewMode: 'month',
@@ -132,6 +149,83 @@ export const useAppStore = create<AppState>((set, get) => ({
   openOcrModal: () => set({ ocrModalOpen: true }),
   closeOcrModal: () => set({ ocrModalOpen: false }),
 
+  setOcrDrafts: (draftsOrFn) => {
+    if (typeof draftsOrFn === 'function') {
+      set((state) => ({ ocrDrafts: draftsOrFn(state.ocrDrafts) }));
+    } else {
+      set({ ocrDrafts: draftsOrFn });
+    }
+  },
+
+  clearOcrDrafts: () => set({ ocrDrafts: [] }),
+
+  processOcrFiles: async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const validFiles: File[] = [];
+    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png'];
+
+    fileArray.forEach((file) => {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext && allowedExts.includes(ext)) {
+        validFiles.push(file);
+      }
+    });
+
+    if (validFiles.length === 0) {
+      get().showToast('仅支持上传 .pdf, .jpg, .jpeg, .png 格式的票据文件', 'error');
+      return;
+    }
+
+    set({
+      isOcrProcessing: true,
+      ocrTotalFiles: validFiles.length,
+      ocrCompletedFiles: 0,
+      ocrProgressText: `准备识别 ${validFiles.length} 张票据...`,
+    });
+
+    const newDrafts: DraftTrip[] = [];
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      set({
+        ocrCompletedFiles: i,
+        ocrProgressText: `正在处理第 ${i + 1}/${validFiles.length} 张: ${file.name}`,
+      });
+
+      const result = await processTicketOcr(file, get().ocrConfig);
+
+      const draft: DraftTrip = {
+        ...result,
+        editedTrainNumber: result.trainNumber || '',
+        editedTransport: result.transportType || '火车',
+        editedOrigin: result.origin || '',
+        editedDestination: result.destination || '',
+        editedDate: result.departureDate || new Date().toISOString().split('T')[0],
+        editedStartTime: result.departureTime || '',
+        editedAmount: result.price || 0,
+        editedRemarks: result.seatInfo ? `席别: ${result.seatInfo}` : '',
+      };
+
+      newDrafts.push(draft);
+    }
+
+    const successCount = newDrafts.filter((d) => d.status === 'success').length;
+
+    set((state) => ({
+      ocrDrafts: [...state.ocrDrafts, ...newDrafts],
+      isOcrProcessing: false,
+      ocrProgressText: '',
+      ocrCompletedFiles: validFiles.length,
+      ocrModalOpen: true, // Auto pop-up review/save modal when completed!
+    }));
+
+    if (successCount > 0) {
+      get().showToast(`已成功识别 ${successCount} 张票据，为您弹出一键核对保存界面！`, 'success');
+    } else {
+      get().showToast('票据处理完毕，请在弹窗中进行核对', 'info');
+    }
+  },
+
   saveOcrConfig: async (config: OcrConfig) => {
     await db.saveSetting('ocrConfig', config);
     set({ ocrConfig: config });
@@ -143,7 +237,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await db.saveTrip(trip);
     }
     const trips = await db.getAllTrips();
-    set({ trips, ocrModalOpen: false });
+    set({ trips, ocrModalOpen: false, ocrDrafts: [] });
     get().showToast(`已批量保存 ${newTrips.length} 条行程记录`, 'success');
   },
 

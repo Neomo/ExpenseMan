@@ -18,7 +18,10 @@ import {
   Key,
   ShieldCheck,
   Save,
+  Layers,
 } from 'lucide-react';
+import { TicketRegionEditorModal } from '../OCR/TicketRegionEditorModal';
+import { DEFAULT_RAILWAY_TEMPLATE } from '../../utils/ticketOcr';
 
 // Zod Schema for JSON Backup Validation
 const backupDataSchema = z.object({
@@ -75,6 +78,9 @@ export const DataSettingsView: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importModeModalOpen, setImportModeModalOpen] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<any>(null);
+
+  // Coordinate Editor Modal state
+  const [isCoordinateEditorOpen, setIsCoordinateEditorOpen] = useState(false);
 
   const transportCategories = customCategories.filter((c) => c.type === 'transport');
   const expenseCategories = customCategories.filter((c) => c.type === 'expense');
@@ -413,6 +419,61 @@ export const DataSettingsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Section 4: Ticket Coordinate Region Mapping Profiles */}
+      <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#52c488]" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>车票物理坐标校准 & 区域识别配对模板</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
+                  物理坐标锁定引擎
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                可自定义划框配置中国铁路 12306 电子行程单、机票与大巴票关键字段的位置坐标，彻底消除开票日期与出发地错位的识别难题。
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsCoordinateEditorOpen(true)}
+            className="px-4 py-2 rounded-xl bg-[#52c488] hover:bg-[#3f9e6d] text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all shrink-0 border-b-2 border-[#32855b]"
+          >
+            <Layers className="w-4 h-4" />
+            <span>📐 校准车票字段物理坐标</span>
+          </button>
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
+          <div className="space-y-1">
+            <div className="font-bold text-slate-800 dark:text-slate-200">
+              当前全局默认模板：中国铁路电子客票 / 行程单标准模板
+            </div>
+            <div className="text-[#8e8071] dark:text-slate-400 text-[11px]">
+              包含字段：起点、终点、车次/航班、乘车日期（排除开票日期）、发车时间、票价、席别
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold border border-emerald-300">
+            已激活
+          </span>
+        </div>
+      </div>
+
+      {/* Coordinate Editor Modal */}
+      {isCoordinateEditorOpen && (
+        <TicketRegionEditorModal
+          isOpen={isCoordinateEditorOpen}
+          onClose={() => setIsCoordinateEditorOpen(false)}
+          currentTemplate={DEFAULT_RAILWAY_TEMPLATE}
+          onSaveTemplate={(updatedTemplate) => {
+            showToast(`已成功保存车票物理坐标匹配模板【${updatedTemplate.name}】！`, 'success');
+            setIsCoordinateEditorOpen(false);
+          }}
+        />
+      )}
 
       {/* Modal for Custom Category Add */}
       <AddCustomCategoryModal

@@ -21,7 +21,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b-2 border-[#82d8a7]/40 dark:border-slate-800 transition-colors h-20 px-4 sm:px-8 flex items-center shadow-sm">
-      <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
+      <div className="max-w-[1920px] mx-auto w-full flex items-center justify-between gap-4">
         {/* Brand Header */}
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('calendar')}>
           <div className="w-11 h-11 bg-[#52c488] rounded-2xl flex items-center justify-center text-white border-b-4 border-[#379462] shadow-sm group-hover:scale-105 transition-all shrink-0">

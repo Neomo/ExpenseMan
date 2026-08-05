@@ -137,13 +137,13 @@ async function startServer() {
 请仔细查看这张票据图片，精准提取票面上打印的关键行程信息，并按 JSON 格式输出。
 
 提取规则与核心字段要求：
-1. origin (起点/出发站): 必须提取出发站或始发站名称，例如 "北京南"、"广州东"、"上海虹桥"、"成都东"、"南京" 等。切勿误混为到达站或乘车人姓名。
-2. destination (终点/到达站): 必须提取到达站名称，例如 "杭州东"、"深圳北"、"武汉" 等。
+1. origin (起点/始发站): 必须提取出发站或始发站名称（通常在票面左上方/左侧），例如 "武汉"、"汉口"、"北京南" 等。【重要】：即便票面文字被换行拆分（如 "武汉\n站"、"武汉\n 站"）或与 "站" 字分开，也必须精准提取站名 "武汉"（切记去除末尾的"站"或"机场"字，严禁误提取为 "电子客票"、"行程单" 等标题词）。
+2. destination (终点/到达站): 必须提取到达站名称（通常在票面右上方/右侧），例如 "咸宁北"、"宜昌东" 等。【重要】：即便票面文字被换行拆分（如 "咸宁北\n站"、"咸宁北\n 站"）或与 "站" 字分开，也必须精准提取站名 "咸宁北"（切记去除末尾的"站"或"机场"字）。
 3. trainNumber (车次/航班号): 如 G1234, D5678, K102, CA1831, MU5101 等。
 4. transportType: "高铁", "火车", "飞机", "大巴", "的士", "网约车" 等。
-5. departureDate: 出发日期，格式统一为 YYYY-MM-DD (如 2026-08-01)。请仔细查验票面上打印的完整日期。
+5. departureDate: 乘车日期/出发日期，格式统一为 YYYY-MM-DD (如 2026-07-16)。【重要】：即便票面上的日期被拆分为多行或包含空格（如 "2026\n年\n07\n月\n22\n日" 或 "2026 年 07 月 22 日"），也必须将其合并组合解析为标准的 YYYY-MM-DD 格式（如 2026-07-22）。切勿遗漏月份或日期，严禁将票面右下角或底部标注的 "开票日期"、"填开日期"、"发票打印日期" 误当作 departureDate！
 6. departureTime: 出发时间/发车时间，24小时制 HH:mm (如 08:30)。
-7. price: 票价/车费金额 (纯数字，如 553.5)。
+7. price: 票价/车费金额 (纯数字，如 108.5)。
 8. seatInfo: 座位席别/车厢号/座位号 (如 "二等座 05车12A号"、"经济舱" 等)。
 9. confidenceScores: 各关键字段识别置信度 (0.0 - 1.0 的浮点数)。`;
 
@@ -224,16 +224,62 @@ async function startServer() {
 
       // If all Gemini AI models failed (e.g. 429 RESOURCE_EXHAUSTED quota limits)
       console.warn('All Gemini AI models failed/exhausted quota, triggering smart rule fallback parser');
+
+      const isStationNoise = (str: string) => {
+        if (!str) return true;
+        const s = str.trim().replace(/站$/, '').replace(/机场$/, '');
+        if (s.length < 2 || s.length > 8) return true;
+        return /中国|铁路|国家|税务|总局|电子|客票|行程单|发票|开票|填开|报销|凭证|乘车|出发|到达|离港|改签|退票|身份证|号码|姓名|专用|章|复核|有限|责任|公司|人民币|二等|一等|商务|特等|硬座|硬卧|软卧|无座|联|存|款|即|元|车票|打印|票价|序号|金额|复核|项目|日期|时间|票号|席别|车厢|座位|舱位|座位号|检票|窗口|单价|校验|存根/i.test(
+          s
+        );
+      };
+
+      const extractDateFromRaw = (rawText: string) => {
+        if (!rawText) return '';
+        const text = rawText.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const fullMatch = text.match(/(\d{4})\s*(?:年|[\.\-\/])\s*(\d{1,2})\s*(?:月|[\.\-\/])\s*(\d{1,2})\s*日?/);
+        if (fullMatch) {
+          const y = parseInt(fullMatch[1], 10);
+          const m = parseInt(fullMatch[2], 10);
+          const d = parseInt(fullMatch[3], 10);
+          if (y >= 2020 && y <= 2040 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
+        }
+        const spaceMatch = text.match(/\b(20\d{2})\s+(\d{1,2})\s+(\d{1,2})\b/);
+        if (spaceMatch) {
+          const y = parseInt(spaceMatch[1], 10);
+          const m = parseInt(spaceMatch[2], 10);
+          const d = parseInt(spaceMatch[3], 10);
+          if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
+        }
+        return '';
+      };
+
+      const extractTimeFromRaw = (rawText: string) => {
+        if (!rawText) return '';
+        const match = rawText.match(/([012]?\d)\s*[:：]\s*([0-5]\d)/);
+        if (match) {
+          const h = parseInt(match[1], 10);
+          const m = match[2];
+          if (h >= 0 && h <= 23) {
+            return `${String(h).padStart(2, '0')}:${m}`;
+          }
+        }
+        return '';
+      };
       
       let fallbackData: any = {
         isValidTicket: true,
         trainNumber: '',
         origin: '',
         destination: '',
-        departureDate: new Date().toISOString().split('T')[0],
-        departureTime: '08:30',
+        departureDate: '',
+        departureTime: '',
         price: 0,
-        seatInfo: '二等座',
+        seatInfo: '',
         confidenceScores: {
           trainNumber: 0.8,
           origin: 0.8,
@@ -244,7 +290,7 @@ async function startServer() {
           seatInfo: 0.7,
         },
         providerUsed: 'rule_fallback',
-        quotaExceededNotice: 'API 调用已达免费配额上限，已启用规则兜底提取，请人工核对并调整字段',
+        quotaExceededNotice: 'API 调用已达免费配额上限，已启用规则降级提取，请核对并调整字段',
       };
 
       if (pdfTextLines && Array.isArray(pdfTextLines) && pdfTextLines.length > 0) {
@@ -252,25 +298,59 @@ async function startServer() {
         const trainMatch = fullText.match(/\b([GDCKTZ]\d{1,4}|[A-Z0-9]{2}\d{3,4})\b/i);
         if (trainMatch) fallbackData.trainNumber = trainMatch[1].toUpperCase();
 
-        const dateMatch = fullText.match(/(\d{4})[年.-/](\d{1,2})[月.-/](\d{1,2})/);
-        if (dateMatch) {
-          fallbackData.departureDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+        // Departure Date: Filter out lines containing 开票, 填开, 发票, 打印
+        const nonInvoiceLines: string[] = [];
+        for (const line of pdfTextLines) {
+          if (/开票|填开|发票|打印日期/i.test(line)) break;
+          nonInvoiceLines.push(line);
         }
+        
+        fallbackData.departureDate = extractDateFromRaw(nonInvoiceLines.join(' ')) || extractDateFromRaw(fullText);
+        fallbackData.departureTime = extractTimeFromRaw(nonInvoiceLines.join(' ')) || extractTimeFromRaw(fullText);
 
-        const timeMatch = fullText.match(/([012]?\d):([0-5]\d)/);
-        if (timeMatch) {
-          fallbackData.departureTime = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-        }
-
-        const priceMatch = fullText.match(/([¥￥]?\s*\d+(\.\d{1,2})?\s*元?)/);
+        const priceMatch = fullText.match(/(?:￥|¥|人民币|票价|金额|元)?\s*(\d+\.\d{1,2})\s*元?/);
         if (priceMatch) {
-          const p = parseFloat(priceMatch[1].replace(/[^\d.]/g, ''));
+          const p = parseFloat(priceMatch[1]);
           if (p) fallbackData.price = p;
         }
 
-        const stationMatches = fullText.match(/([\u4e00-\u9fa5]{2,6}站)/g) || [];
-        if (stationMatches[0]) fallbackData.origin = stationMatches[0].replace('站', '');
-        if (stationMatches[1]) fallbackData.destination = stationMatches[1].replace('站', '');
+        // Stations: route match or clean station words across non-invoice lines
+        const headerJoined = nonInvoiceLines.join(' ');
+        const routeMatch = headerJoined.match(
+          /([\u4e00-\u9fa5]{2,6}(?:站|机场)?)\s*(?:至|->|—|—→|–|到|-|\s+)\s*([\u4e00-\u9fa5]{2,6}(?:站|机场)?)/
+        );
+        if (routeMatch) {
+          const orig = routeMatch[1].replace(/站$/, '').replace(/机场$/, '').trim();
+          const dest = routeMatch[2].replace(/站$/, '').replace(/机场$/, '').trim();
+          if (!isStationNoise(orig)) fallbackData.origin = orig;
+          if (!isStationNoise(dest) && dest !== fallbackData.origin) fallbackData.destination = dest;
+        }
+
+        if (!fallbackData.origin || !fallbackData.destination) {
+          const cleanStations: string[] = [];
+          for (const line of nonInvoiceLines) {
+            const matches = line.match(/[\u4e00-\u9fa5]{2,6}/g) || [];
+            for (const m of matches) {
+              const cleaned = m.replace(/站$/, '').replace(/机场$/, '').trim();
+              if (
+                cleaned.length >= 2 &&
+                cleaned.length <= 6 &&
+                !isStationNoise(cleaned) &&
+                !cleanStations.includes(cleaned) &&
+                !/\d/.test(cleaned)
+              ) {
+                cleanStations.push(cleaned);
+              }
+            }
+          }
+          if (!fallbackData.origin && cleanStations[0]) {
+            fallbackData.origin = cleanStations[0];
+          }
+          if (!fallbackData.destination) {
+            const destCand = cleanStations.find((s) => s !== fallbackData.origin);
+            if (destCand) fallbackData.destination = destCand;
+          }
+        }
       }
 
       return res.json(fallbackData);
@@ -278,13 +358,13 @@ async function startServer() {
       console.error('OCR Ticket processing catch fallback:', err);
       return res.json({
         isValidTicket: true,
-        trainNumber: 'G1234',
-        origin: '北京南',
-        destination: '上海虹桥',
-        departureDate: new Date().toISOString().split('T')[0],
-        departureTime: '08:30',
-        price: 553.5,
-        seatInfo: '二等座 05车12A号',
+        trainNumber: '',
+        origin: '',
+        destination: '',
+        departureDate: '',
+        departureTime: '',
+        price: 0,
+        seatInfo: '',
         confidenceScores: {
           trainNumber: 0.7,
           origin: 0.7,
@@ -295,7 +375,7 @@ async function startServer() {
           seatInfo: 0.7,
         },
         providerUsed: 'client_fallback',
-        quotaExceededNotice: '配额超出，已自动生成草稿供手动修正',
+        quotaExceededNotice: '处理发生异常，已保留草稿，请补充填写',
       });
     }
   });

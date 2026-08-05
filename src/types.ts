@@ -32,10 +32,44 @@ export interface CustomCategory {
   isDefault?: boolean;
 }
 
+export interface RegionBox {
+  x: number;      // 0 - 100 percentage
+  y: number;      // 0 - 100 percentage
+  width: number;  // 0 - 100 percentage
+  height: number; // 0 - 100 percentage
+}
+
+export type TicketFieldKey =
+  | 'origin'
+  | 'destination'
+  | 'departureDate'
+  | 'departureTime'
+  | 'trainNumber'
+  | 'price'
+  | 'seatInfo';
+
+export interface TicketTemplateProfile {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  ticketType?: 'train' | 'flight' | 'bus' | 'general';
+  regions: Record<TicketFieldKey, RegionBox>;
+  createdAt: number;
+}
+
+export interface PdfTextItemWithPos {
+  text: string;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  w: number; // percentage 0-100
+  h: number; // percentage 0-100
+}
+
 export interface OcrConfig {
   provider: 'local_paddle' | 'system_gemini' | 'custom_gemini' | 'baidu_ocr' | 'tencent_ocr' | 'aliyun_ocr';
   apiKey?: string;
   apiSecret?: string;
+  activeTemplateId?: string;
 }
 
 export interface TicketOcrResult {
@@ -59,8 +93,23 @@ export interface TicketOcrResult {
   providerUsed?: string;
   providerName?: string;
   pdfTextLines?: string[];
+  pdfTextItemsWithPos?: PdfTextItemWithPos[];
   convertedImageResolution?: string;
   processingSteps?: { stepName: string; status: 'done' | 'processing' | 'failed'; detail?: string }[];
+  appliedTemplateName?: string;
+  appliedTemplateId?: string;
+}
+
+export interface DraftTrip extends TicketOcrResult {
+  editedTrainNumber: string;
+  editedTransport: TransportType;
+  editedOrigin: string;
+  editedDestination: string;
+  editedDate: string;
+  editedStartTime: string;
+  editedAmount: number;
+  editedRemarks: string;
+  isEditing?: boolean;
 }
 
 export interface AppSettings {

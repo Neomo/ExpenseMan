@@ -16,10 +16,18 @@ import { TripFormModal } from './components/Forms/TripFormModal';
 import { ExpenseFormModal } from './components/Forms/ExpenseFormModal';
 import { TicketOcrModal } from './components/OCR/TicketOcrModal';
 import { Toast } from './components/Common/Toast';
-import { Plane } from 'lucide-react';
+import { Plane, RefreshCw, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const { init, isLoading, activeTab } = useAppStore();
+  const {
+    init,
+    isLoading,
+    activeTab,
+    isOcrProcessing,
+    ocrProgressText,
+    ocrTotalFiles,
+    ocrCompletedFiles,
+  } = useAppStore();
 
   useEffect(() => {
     init();
@@ -45,19 +53,52 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar />
 
-      {/* Main Container */}
-      <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col md:flex-row pb-16 md:pb-8">
+      {/* Widescreen Main Container */}
+      <div className="max-w-[1920px] w-full mx-auto flex-1 flex flex-col md:flex-row pb-16 md:pb-8 px-2 sm:px-4 lg:px-6">
         {/* Desktop Sidebar */}
         <Sidebar />
 
         {/* Dynamic Tab Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0">
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'list' && <ItemListView />}
           {activeTab === 'report' && <ReportView />}
           {activeTab === 'settings' && <DataSettingsView />}
         </main>
       </div>
+
+      {/* Floating Background OCR Progress Badge */}
+      {isOcrProcessing && (
+        <div className="fixed bottom-20 md:bottom-6 right-6 z-50 p-4 rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-3 border-[#52c488] shadow-2xl flex items-center gap-4 max-w-sm border-b-4 border-b-[#379462]">
+          <div className="w-10 h-10 rounded-2xl bg-[#e3f6ec] text-[#2f8859] flex items-center justify-center shrink-0 font-bold">
+            <RefreshCw className="w-5 h-5 animate-spin text-[#52c488]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between text-xs font-black text-[#21633f] dark:text-emerald-300 mb-1">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                后台自动识别中...
+              </span>
+              <span>{ocrCompletedFiles}/{ocrTotalFiles}</span>
+            </div>
+            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-1">
+              <div
+                className="bg-[#52c488] h-full transition-all duration-300 rounded-full"
+                style={{
+                  width: `${
+                    ocrTotalFiles > 0
+                      ? Math.round((ocrCompletedFiles / ocrTotalFiles) * 100)
+                      : 10
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
+              {ocrProgressText}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Bottom Navigation */}
       <BottomNav />
