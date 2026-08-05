@@ -69,6 +69,9 @@ export const ReportView: React.FC = () => {
   const [showTrips, setShowTrips] = useState<boolean>(true);
   const [showExpenses, setShowExpenses] = useState<boolean>(true);
 
+  // Sort state for tables
+  const [tableSortOrder, setTableSortOrder] = useState<'desc' | 'asc'>('desc'); // default: 最近到最远
+
   // Compute active date range based on dimension
   const dateRange = useMemo(() => {
     const targetDate = parseDateStr(targetDateStr);
@@ -107,16 +110,22 @@ export const ReportView: React.FC = () => {
     }
   }, [dimension, targetDateStr, startDateStr, endDateStr]);
 
-  // Filter items in range
+  // Filter items in range and sort by date
   const filteredTrips = useMemo(() => {
     if (!showTrips) return [];
-    return trips.filter((t) => t.date >= dateRange.start && t.date <= dateRange.end);
-  }, [trips, dateRange, showTrips]);
+    const list = trips.filter((t) => t.date >= dateRange.start && t.date <= dateRange.end);
+    return list.sort((a, b) =>
+      tableSortOrder === 'desc' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)
+    );
+  }, [trips, dateRange, showTrips, tableSortOrder]);
 
   const filteredExpenses = useMemo(() => {
     if (!showExpenses) return [];
-    return expenses.filter((e) => e.date >= dateRange.start && e.date <= dateRange.end);
-  }, [expenses, dateRange, showExpenses]);
+    const list = expenses.filter((e) => e.date >= dateRange.start && e.date <= dateRange.end);
+    return list.sort((a, b) =>
+      tableSortOrder === 'desc' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)
+    );
+  }, [expenses, dateRange, showExpenses, tableSortOrder]);
 
   // Totals
   const tripSubtotal = filteredTrips.reduce((sum, t) => sum + t.amount, 0);
@@ -480,6 +489,21 @@ export const ReportView: React.FC = () => {
 
       {/* Detailed Tables */}
       <div className="space-y-6">
+        {/* Sort Order Bar */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            📊 账单明细表显示顺序设置
+          </span>
+          <button
+            type="button"
+            id="report-table-sort-btn"
+            onClick={() => setTableSortOrder(tableSortOrder === 'desc' ? 'asc' : 'desc')}
+            className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-xs font-bold border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <span>排序方式: {tableSortOrder === 'desc' ? '最近到最远 ⬇️ (默认)' : '由远到近 ⬆️'}</span>
+          </button>
+        </div>
+
         {/* Table 1: Travel Trips */}
         {showTrips && (
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
@@ -502,6 +526,7 @@ export const ReportView: React.FC = () => {
                     <tr>
                       <th className="py-2.5 px-3">日期</th>
                       <th className="py-2.5 px-3">交通工具</th>
+                      <th className="py-2.5 px-3">车次/航班号</th>
                       <th className="py-2.5 px-3">起止地点</th>
                       <th className="py-2.5 px-3">起止时间</th>
                       <th className="py-2.5 px-3 text-right">金额 (元)</th>
@@ -516,6 +541,15 @@ export const ReportView: React.FC = () => {
                           <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-medium">
                             {t.transport}
                           </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {t.trainNumber ? (
+                            <span className="px-2 py-0.5 rounded-md bg-[#e3f6ec] text-[#2f8859] dark:bg-emerald-950 dark:text-emerald-300 font-bold border border-[#a2e0bd] font-mono">
+                              {t.trainNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3">
                           {t.origin || '-'} → {t.destination || '-'}

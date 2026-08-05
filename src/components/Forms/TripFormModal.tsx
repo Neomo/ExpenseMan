@@ -10,6 +10,7 @@ import { AddCustomCategoryModal } from './AddCustomCategoryModal';
 
 const tripSchema = z.object({
   transport: z.string().min(1, '请选择或输入交通工具'),
+  trainNumber: z.string().optional(),
   date: z.string().min(1, '请选择日期'),
   origin: z.string().optional(),
   destination: z.string().optional(),
@@ -48,6 +49,7 @@ export const TripFormModal: React.FC = () => {
     resolver: zodResolver(tripSchema),
     defaultValues: {
       transport: '的士',
+      trainNumber: '',
       date: selectedDate,
       origin: '',
       destination: '',
@@ -62,6 +64,7 @@ export const TripFormModal: React.FC = () => {
     if (editingTrip) {
       reset({
         transport: editingTrip.transport,
+        trainNumber: editingTrip.trainNumber || '',
         date: editingTrip.date,
         origin: editingTrip.origin || '',
         destination: editingTrip.destination || '',
@@ -73,6 +76,7 @@ export const TripFormModal: React.FC = () => {
     } else {
       reset({
         transport: transportOptions[0]?.name || '的士',
+        trainNumber: '',
         date: selectedDate,
         origin: '',
         destination: '',
@@ -91,6 +95,7 @@ export const TripFormModal: React.FC = () => {
       id: editingTrip ? editingTrip.id : `trip-${Date.now()}`,
       date: data.date,
       transport: data.transport,
+      trainNumber: data.trainNumber?.trim() || undefined,
       origin: data.origin?.trim() || undefined,
       destination: data.destination?.trim() || undefined,
       startTime: data.startTime || undefined,
@@ -149,35 +154,50 @@ export const TripFormModal: React.FC = () => {
 
             {/* Modal Body */}
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 overflow-y-auto space-y-4 flex-1">
-              {/* Transport Selection & Custom Extension */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    交通工具 <span className="text-rose-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setCustomCatModalOpen(true)}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              {/* Transport Selection & Train Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      交通工具 <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomCatModalOpen(true)}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      扩展类别
+                    </button>
+                  </div>
+                  <select
+                    id="trip-transport-select"
+                    {...register('transport')}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-sm"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    扩展类别
-                  </button>
+                    {transportOptions.map((opt, idx) => (
+                      <option key={`topt-${opt.id}-${idx}`} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.transport && (
+                    <p className="mt-1 text-xs text-rose-500">{errors.transport.message}</p>
+                  )}
                 </div>
-                <select
-                  id="trip-transport-select"
-                  {...register('transport')}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-sm"
-                >
-                  {transportOptions.map((opt, idx) => (
-                    <option key={`topt-${opt.id}-${idx}`} value={opt.name}>
-                      {opt.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.transport && (
-                  <p className="mt-1 text-xs text-rose-500">{errors.transport.message}</p>
-                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    车次/航班号 (选填)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例：G1234 / MU5108"
+                    id="trip-trainnumber-input"
+                    {...register('trainNumber')}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-emerald-700 dark:text-emerald-300 font-mono"
+                  />
+                </div>
               </div>
 
               {/* Date Input */}

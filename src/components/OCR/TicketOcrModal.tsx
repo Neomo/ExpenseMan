@@ -167,6 +167,7 @@ export const TicketOcrModal: React.FC = () => {
       id: `trip-ocr-${Date.now()}`,
       date: draft.editedDate || new Date().toISOString().split('T')[0],
       transport: draft.editedTransport,
+      trainNumber: draft.editedTrainNumber?.trim() || undefined,
       origin: draft.editedOrigin || undefined,
       destination: draft.editedDestination || undefined,
       startTime: draft.editedStartTime || undefined,
@@ -191,6 +192,7 @@ export const TicketOcrModal: React.FC = () => {
       id: `trip-ocr-${Date.now()}-${index}`,
       date: d.editedDate || new Date().toISOString().split('T')[0],
       transport: d.editedTransport,
+      trainNumber: d.editedTrainNumber?.trim() || undefined,
       origin: d.editedOrigin || undefined,
       destination: d.editedDestination || undefined,
       startTime: d.editedStartTime || undefined,
@@ -385,7 +387,14 @@ export const TicketOcrModal: React.FC = () => {
                             </span>
                           )}
 
-                          {draft.status === 'success' && (
+                          {draft.isDuplicate && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 flex items-center gap-1 border border-amber-300">
+                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                              库中完全重复(车次/日期/起止/费用)
+                            </span>
+                          )}
+
+                          {draft.status === 'success' && !draft.isDuplicate && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center gap-1 border border-emerald-300">
                               <CheckCircle2 className="w-3 h-3" />
                               识别成功

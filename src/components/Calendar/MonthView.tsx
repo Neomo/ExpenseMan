@@ -69,7 +69,7 @@ export const MonthView: React.FC = () => {
               id={`month-cell-${cell.dateStr}`}
               onClick={() => setSelectedDate(cell.dateStr)}
               onDoubleClick={() => openDateDetail(cell.dateStr)}
-              className={`min-h-[140px] sm:min-h-[160px] lg:min-h-[175px] xl:min-h-[190px] p-2.5 flex flex-col justify-between cursor-pointer group transition-all relative rounded-xl border border-transparent ${
+              className={`min-h-[85px] sm:min-h-[100px] md:min-h-[110px] xl:min-h-[120px] 2xl:min-h-[135px] p-2 flex flex-col justify-between cursor-pointer group transition-all relative rounded-xl border border-transparent ${
                 !cell.isCurrentMonth
                   ? 'bg-[#f8fbf9]/60 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600 opacity-60'
                   : 'bg-white dark:bg-slate-900 text-[#433932] dark:text-slate-200 hover:bg-[#f0f8f3] dark:hover:bg-slate-800/60'

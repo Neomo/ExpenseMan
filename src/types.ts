@@ -6,6 +6,7 @@ export interface TripItem {
   id: string;
   date: string; // YYYY-MM-DD
   transport: TransportType;
+  trainNumber?: string; // 车次 / 航班号 (e.g. G1234, MU5108)
   origin?: string;
   destination?: string;
   startTime?: string; // HH:mm
@@ -110,6 +111,7 @@ export interface DraftTrip extends TicketOcrResult {
   editedAmount: number;
   editedRemarks: string;
   isEditing?: boolean;
+  isDuplicate?: boolean;
 }
 
 export interface AppSettings {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { CalendarHeader } from './CalendarHeader';
 import { MonthView } from './MonthView';
@@ -6,9 +6,20 @@ import { WeekView } from './WeekView';
 import { DayView } from './DayView';
 import { DateDetailModal } from './DateDetailModal';
 import { CalendarRightPanel } from './CalendarRightPanel';
+import { motion, AnimatePresence } from 'motion/react';
+import { X } from 'lucide-react';
 
 export const CalendarView: React.FC = () => {
   const { currentViewMode, calendarFocusDate, trips, expenses } = useAppStore();
+  const [showTip, setShowTip] = useState(true);
+
+  // Auto-hide interaction tip after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowTip(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Compute stats for current focused month
   const focusedYear = calendarFocusDate.getFullYear();
@@ -44,13 +55,29 @@ export const CalendarView: React.FC = () => {
     <div className="space-y-6">
       <CalendarHeader />
 
-      {/* Interactive Guidance Tip */}
-      <div className="bg-[#faf5e8] dark:bg-slate-800/80 border-2 border-[#eadaa8] dark:border-slate-700 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-2 text-xs font-bold text-[#54411f] dark:text-slate-300 shadow-xs">
-        <span className="flex items-center gap-1.5">
-          <span>💡</span>
-          <span>交互提示：<b>单击</b>日期即可在右侧面板预览该日行程与费用；<b>双击</b>日期弹窗全屏详情。</span>
-        </span>
-      </div>
+      {/* Interactive Guidance Tip (Auto-hides after 3 seconds) */}
+      <AnimatePresence>
+        {showTip && (
+          <motion.div
+            initial={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: 'hidden' }}
+            transition={{ duration: 0.4 }}
+            className="bg-[#faf5e8] dark:bg-slate-800/80 border-2 border-[#eadaa8] dark:border-slate-700 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-2 text-xs font-bold text-[#54411f] dark:text-slate-300 shadow-xs"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>💡</span>
+              <span>交互提示：<b>单击</b>日期即可在右侧面板预览该日行程与费用；<b>双击</b>日期弹窗全屏详情。</span>
+            </span>
+            <button
+              onClick={() => setShowTip(false)}
+              className="p-1 text-[#8e8071] hover:text-[#54411f] dark:hover:text-slate-100 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              title="关闭提示"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Grid with Calendar on Left (Expanded for Widescreen) and Details Side Panel on Right */}
       <div className="grid grid-cols-1 xl:grid-cols-12 2xl:grid-cols-12 gap-6 items-start">

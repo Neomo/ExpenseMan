@@ -126,10 +126,15 @@ export const DateDetailModal: React.FC = () => {
                         className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-blue-300 dark:hover:border-blue-700 transition-all flex items-center justify-between gap-3"
                       >
                         <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
                               {t.transport}
                             </span>
+                            {t.trainNumber && (
+                              <span className="px-2 py-0.5 rounded-md text-xs font-black bg-[#e3f6ec] text-[#2f8859] dark:bg-emerald-950 dark:text-emerald-300 border border-[#a2e0bd] dark:border-emerald-800 font-mono">
+                                {t.trainNumber}
+                              </span>
+                            )}
                             {(t.origin || t.destination) && (
                               <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
                                 {t.origin || '未知起点'} → {t.destination || '未知终点'}

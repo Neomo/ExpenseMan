@@ -194,6 +194,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const result = await processTicketOcr(file, get().ocrConfig);
 
+      const existingTrips = get().trips;
+
+      const isDup = existingTrips.some((existing) => {
+        const sameTrain = (result.trainNumber || '').trim().toLowerCase() === (existing.trainNumber || '').trim().toLowerCase();
+        const sameDate = (result.departureDate || '') === existing.date;
+        const sameOrigin = (result.origin || '').trim().toLowerCase() === (existing.origin || '').trim().toLowerCase();
+        const sameDest = (result.destination || '').trim().toLowerCase() === (existing.destination || '').trim().toLowerCase();
+        const sameAmount = Math.abs((result.price || 0) - existing.amount) < 0.01;
+        return sameTrain && sameDate && sameOrigin && sameDest && sameAmount;
+      });
+
       const draft: DraftTrip = {
         ...result,
         editedTrainNumber: result.trainNumber || '',
@@ -204,12 +215,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         editedStartTime: result.departureTime || '',
         editedAmount: result.price || 0,
         editedRemarks: result.seatInfo ? `席别: ${result.seatInfo}` : '',
+        isDuplicate: isDup,
       };
 
       newDrafts.push(draft);
     }
 
     const successCount = newDrafts.filter((d) => d.status === 'success').length;
+    const dupCount = newDrafts.filter((d) => d.isDuplicate).length;
 
     set((state) => ({
       ocrDrafts: [...state.ocrDrafts, ...newDrafts],
@@ -219,7 +232,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       ocrModalOpen: true, // Auto pop-up review/save modal when completed!
     }));
 
-    if (successCount > 0) {
+    if (dupCount > 0) {
+      get().showToast(
+        `处理完成 ${validFiles.length} 张票据，其中检测到 ${dupCount} 张与现有数据完全重复(车次/日期/起止/费用相同)`,
+        'info'
+      );
+    } else if (successCount > 0) {
       get().showToast(`已成功识别 ${successCount} 张票据，为您弹出一键核对保存界面！`, 'success');
     } else {
       get().showToast('票据处理完毕，请在弹窗中进行核对', 'info');
@@ -233,12 +251,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   batchAddTrips: async (newTrips: TripItem[]) => {
+    const existingTrips = get().trips;
+    const uniqueTrips: TripItem[] = [];
+    let skippedDuplicates = 0;
+
     for (const trip of newTrips) {
-      await db.saveTrip(trip);
+      const isDup = existingTrips.some((existing) => {
+        const sameTrain = (trip.trainNumber || '').trim().toLowerCase() === (existing.trainNumber || '').trim().toLowerCase();
+        const sameDate = trip.date === existing.date;
+        const sameOrigin = (trip.origin || '').trim().toLowerCase() === (existing.origin || '').trim().toLowerCase();
+        const sameDest = (trip.destination || '').trim().toLowerCase() === (existing.destination || '').trim().toLowerCase();
+        const sameAmount = Math.abs(trip.amount - existing.amount) < 0.01;
+        return sameTrain && sameDate && sameOrigin && sameDest && sameAmount;
+      });
+
+      if (isDup) {
+        skippedDuplicates++;
+      } else {
+        uniqueTrips.push(trip);
+      }
     }
-    const trips = await db.getAllTrips();
-    set({ trips, ocrModalOpen: false, ocrDrafts: [] });
-    get().showToast(`已批量保存 ${newTrips.length} 条行程记录`, 'success');
+
+    if (uniqueTrips.length > 0) {
+      for (const trip of uniqueTrips) {
+        await db.saveTrip(trip);
+      }
+      const trips = await db.getAllTrips();
+      set({ trips, ocrModalOpen: false, ocrDrafts: [] });
+
+      if (skippedDuplicates > 0) {
+        get().showToast(
+          `成功导入 ${uniqueTrips.length} 条记录（跳过 ${skippedDuplicates} 条在车次、日期、起点、终点、费用维度均相同的重复数据）`,
+          'info'
+        );
+      } else {
+        get().showToast(`已批量保存 ${uniqueTrips.length} 条行程记录`, 'success');
+      }
+    } else {
+      set({ ocrModalOpen: false, ocrDrafts: [] });
+      get().showToast(
+        `检测到 ${newTrips.length} 条识别数据与现有数据在【车次、日期、起点、终点、费用】5个维度完全一致，未重复导入！`,
+        'info'
+      );
+    }
   },
 
   setTheme: (theme) => {
