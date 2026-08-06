@@ -79,6 +79,10 @@ export interface TicketOcrResult {
   fileType: 'pdf' | 'image';
   previewUrl?: string;
   isValidTicket: boolean;
+  recordType?: 'trip' | 'expense';
+  expenseCategory?: ExpenseCategoryType;
+  merchantName?: string;
+  itemName?: string;
   trainNumber?: string;
   transportType?: TransportType;
   origin?: string;
@@ -102,6 +106,9 @@ export interface TicketOcrResult {
 }
 
 export interface DraftTrip extends TicketOcrResult {
+  editedRecordType?: 'trip' | 'expense';
+  editedCategory?: ExpenseCategoryType;
+  editedMerchantName?: string;
   editedTrainNumber: string;
   editedTransport: TransportType;
   editedOrigin: string;

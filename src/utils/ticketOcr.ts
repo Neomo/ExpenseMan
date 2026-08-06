@@ -626,6 +626,27 @@ export function parseTicketInfoFromText(
 }
 
 /**
+ * Detects if a text or invoice contains hotel name and accommodation service item
+ */
+export function detectAccommodationInvoice(text: string): { isAccommodation: boolean; merchantName?: string; itemName?: string } {
+  if (!text) return { isAccommodation: false };
+  const hasHotel = /酒店|宾馆|客栈|民宿|饭店|大酒店|旅馆|山庄|公寓|温泉/i.test(text);
+  const hasAccommodation = /住宿|住宿费|房费|客房|住宿服务|房费发票/i.test(text);
+
+  if (hasHotel && hasAccommodation) {
+    const hotelMatch = text.match(/([\u4e00-\u9fa5A-Za-z0-9]{2,20}(?:酒店|宾馆|客栈|民宿|饭店|大酒店|旅馆))/);
+    const merchantName = hotelMatch ? hotelMatch[1] : undefined;
+    return {
+      isAccommodation: true,
+      merchantName,
+      itemName: '*住宿服务*住宿费',
+    };
+  }
+
+  return { isAccommodation: false };
+}
+
+/**
  * Direct client-side OCR recognition (Pure Frontend Implementation)
  */
 export async function processTicketOcr(
@@ -707,7 +728,16 @@ export async function processTicketOcr(
 
     if (res.ok) {
       const data = await res.json();
-      if (data.isValidTicket || data.trainNumber || data.origin || data.destination) {
+      if (data.isValidTicket || data.trainNumber || data.origin || data.destination || data.recordType === 'expense' || data.price) {
+        const fullPdfText = pdfTextLines.join(' ');
+        const hotelCheck = detectAccommodationInvoice(fullPdfText);
+        const isAccommodation = data.recordType === 'expense' || data.expenseCategory === '住宿' || hotelCheck.isAccommodation;
+
+        const recordType = isAccommodation ? 'expense' : (data.recordType || 'trip');
+        const expenseCategory = isAccommodation ? '住宿' : data.expenseCategory;
+        const merchantName = data.merchantName || hotelCheck.merchantName || '';
+        const itemName = data.itemName || hotelCheck.itemName || '';
+
         const transportType = inferTransportType(data.trainNumber || data.transportType || pdfParsed?.trainNumber);
 
         // Merge Gemini Vision results with pdfParsed cleanly without fake defaults
@@ -725,6 +755,10 @@ export async function processTicketOcr(
           fileType: isPdf ? 'pdf' : 'image',
           previewUrl: imageBase64,
           isValidTicket: true,
+          recordType,
+          expenseCategory,
+          merchantName,
+          itemName,
           trainNumber: finalTrainNumber,
           transportType,
           origin: finalOrigin,

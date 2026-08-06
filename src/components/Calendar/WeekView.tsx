@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { getWeekDaysGrid, formatChineseDate } from '../../utils/dateUtils';
+import { getWeekDaysGrid, formatChineseDate, sortTripsByStartTime } from '../../utils/dateUtils';
 import { Plane, Receipt, Plus, MapPin, Clock } from 'lucide-react';
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -22,7 +22,7 @@ export const WeekView: React.FC = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
       {weekGrid.map((cell, idx) => {
-        const dayTrips = trips.filter((t) => t.date === cell.dateStr);
+        const dayTrips = sortTripsByStartTime(trips.filter((t) => t.date === cell.dateStr));
         const dayExpenses = expenses.filter((e) => e.date === cell.dateStr);
 
         const tripSum = dayTrips.reduce((sum, t) => sum + t.amount, 0);

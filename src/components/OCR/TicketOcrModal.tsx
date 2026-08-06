@@ -14,6 +14,7 @@ import {
   Lock,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Info,
   Check,
   Cpu,
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { processTicketOcr, getOcrProviderName, extractTextInRegionBox, parseFieldFromText, DEFAULT_RAILWAY_TEMPLATE } from '../../utils/ticketOcr';
-import { TicketOcrResult, TripItem, TransportType, TicketTemplateProfile, PdfTextItemWithPos } from '../../types';
+import { TicketOcrResult, TripItem, TransportType, ExpenseCategoryType, TicketTemplateProfile, PdfTextItemWithPos } from '../../types';
 import { TicketRegionEditorModal } from './TicketRegionEditorModal';
 
 interface DraftTrip extends TicketOcrResult {
@@ -40,6 +41,9 @@ interface DraftTrip extends TicketOcrResult {
   editedStartTime: string;
   editedAmount: number;
   editedRemarks: string;
+  editedRecordType?: 'trip' | 'expense';
+  editedCategory?: ExpenseCategoryType;
+  editedMerchantName?: string;
   isEditing?: boolean;
 }
 
@@ -49,7 +53,9 @@ export const TicketOcrModal: React.FC = () => {
     closeOcrModal,
     ocrConfig,
     batchAddTrips,
+    batchAddExpenses,
     openTripModal,
+    openExpenseModal,
     showToast,
     ocrDrafts: drafts,
     setOcrDrafts: setDrafts,
@@ -60,6 +66,9 @@ export const TicketOcrModal: React.FC = () => {
 
   const [dragActive, setDragActive] = useState(false);
   const [expandedDetailsId, setExpandedDetailsId] = useState<string | null>(null);
+
+  // Requirement 3: Collapsible state for Intermediate State & PDF Rendering area (default empty / collapsed)
+  const [expandedIntermediateIds, setExpandedIntermediateIds] = useState<string[]>([]);
 
   // Region Coordinate Editor Modal state
   const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
@@ -161,8 +170,24 @@ export const TicketOcrModal: React.FC = () => {
     setDrafts([]);
   };
 
-  // Save single draft to Trip form
+  // Save single draft to Trip or Expense form
   const handleSingleFillForm = (draft: DraftTrip) => {
+    if (draft.editedRecordType === 'expense') {
+      const expItem = {
+        id: `expense-ocr-${Date.now()}`,
+        date: draft.editedDate || new Date().toISOString().split('T')[0],
+        category: draft.editedCategory || '住宿',
+        amount: Number(draft.editedAmount) || 0,
+        description: draft.editedMerchantName
+          ? `【${draft.editedMerchantName}】${draft.editedRemarks || '住宿发票'}`
+          : draft.editedRemarks || '住宿发票',
+        createdAt: Date.now(),
+      };
+      closeOcrModal();
+      openExpenseModal(expItem);
+      return;
+    }
+
     const tripItem: TripItem = {
       id: `trip-ocr-${Date.now()}`,
       date: draft.editedDate || new Date().toISOString().split('T')[0],
@@ -188,20 +213,39 @@ export const TicketOcrModal: React.FC = () => {
       return;
     }
 
-    const tripItems: TripItem[] = validDrafts.map((d, index) => ({
-      id: `trip-ocr-${Date.now()}-${index}`,
-      date: d.editedDate || new Date().toISOString().split('T')[0],
-      transport: d.editedTransport,
-      trainNumber: d.editedTrainNumber?.trim() || undefined,
-      origin: d.editedOrigin || undefined,
-      destination: d.editedDestination || undefined,
-      startTime: d.editedStartTime || undefined,
-      amount: Number(d.editedAmount) || 0,
-      remarks: d.editedRemarks || undefined,
-      createdAt: Date.now() + index,
-    }));
+    const tripDrafts = validDrafts.filter((d) => d.editedRecordType !== 'expense');
+    const expenseDrafts = validDrafts.filter((d) => d.editedRecordType === 'expense');
 
-    await batchAddTrips(tripItems);
+    if (tripDrafts.length > 0) {
+      const tripItems: TripItem[] = tripDrafts.map((d, index) => ({
+        id: `trip-ocr-${Date.now()}-${index}`,
+        date: d.editedDate || new Date().toISOString().split('T')[0],
+        transport: d.editedTransport,
+        trainNumber: d.editedTrainNumber?.trim() || undefined,
+        origin: d.editedOrigin || undefined,
+        destination: d.editedDestination || undefined,
+        startTime: d.editedStartTime || undefined,
+        amount: Number(d.editedAmount) || 0,
+        remarks: d.editedRemarks || undefined,
+        createdAt: Date.now() + index,
+      }));
+      await batchAddTrips(tripItems);
+    }
+
+    if (expenseDrafts.length > 0) {
+      const expenseItems = expenseDrafts.map((d, index) => ({
+        id: `expense-ocr-${Date.now()}-${index}`,
+        date: d.editedDate || new Date().toISOString().split('T')[0],
+        category: d.editedCategory || '住宿',
+        amount: Number(d.editedAmount) || 0,
+        description: d.editedMerchantName
+          ? `【${d.editedMerchantName}】${d.editedRemarks || '住宿发票识别录入'}`
+          : d.editedRemarks || '住宿发票识别录入',
+        createdAt: Date.now() + index,
+      }));
+      await batchAddExpenses(expenseItems);
+    }
+
     setDrafts([]);
   };
 
@@ -454,166 +498,320 @@ export const TicketOcrModal: React.FC = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {/* Recognized Fields Form Grid */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            {/* Transport & Train Number */}
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                                交通工具 / 车次航班
-                              </label>
-                              <div className="flex gap-1.5">
-                                <select
-                                  value={draft.editedTransport}
-                                  onChange={(e) => {
-                                    const val = e.target.value as TransportType;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedTransport: val } : d))
-                                    );
-                                  }}
-                                  className="w-24 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none bg-white dark:bg-slate-900 dark:text-slate-100"
-                                >
-                                  <option value="高铁">高铁</option>
-                                  <option value="火车">火车</option>
-                                  <option value="飞机">飞机</option>
-                                  <option value="大巴">大巴</option>
-                                  <option value="的士">的士</option>
-                                  <option value="网约车">网约车</option>
-                                </select>
-                                <input
-                                  type="text"
-                                  placeholder="如 G1234"
-                                  value={draft.editedTrainNumber}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedTrainNumber: val } : d))
-                                    );
-                                  }}
-                                  className={`flex-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'trainNumber'
-                                  )}`}
-                                />
-                              </div>
-                            </div>
+                          {/* Type Switcher & Recognized Fields Form Grid */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                <span>单据识别类型：</span>
+                                {draft.editedRecordType === 'expense' ? (
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold text-[11px] border border-amber-300">
+                                    🏨 住宿 / 日常发票
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-extrabold text-[11px] border border-blue-300">
+                                    ✈️ 交通行程客票
+                                  </span>
+                                )}
+                              </span>
 
-                            {/* Origin & Destination */}
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                                起点 → 终点
-                              </label>
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  placeholder="出发站"
-                                  value={draft.editedOrigin}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedOrigin: val } : d))
-                                    );
-                                  }}
-                                  className={`w-1/2 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'origin'
-                                  )}`}
-                                />
-                                <span className="text-slate-400 font-bold">→</span>
-                                <input
-                                  type="text"
-                                  placeholder="到达站"
-                                  value={draft.editedDestination}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedDestination: val } : d))
-                                    );
-                                  }}
-                                  className={`w-1/2 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'destination'
-                                  )}`}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Date & Time */}
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                                出发日期 & 发车时间
-                              </label>
-                              <div className="flex gap-1">
-                                <input
-                                  type="date"
-                                  value={draft.editedDate}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedDate: val } : d))
-                                    );
-                                  }}
-                                  className={`flex-1 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'departureDate'
-                                  )}`}
-                                />
-                                <input
-                                  type="time"
-                                  value={draft.editedStartTime}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedStartTime: val } : d))
-                                    );
-                                  }}
-                                  className={`w-20 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'departureTime'
-                                  )}`}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Price & Action */}
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                                票价/金额 (元)
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={draft.editedAmount}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    setDrafts((prev) =>
-                                      prev.map((d, i) => (i === idx ? { ...d, editedAmount: val } : d))
-                                    );
-                                  }}
-                                  className={`flex-1 px-2.5 py-1.5 rounded-xl text-xs font-black font-mono border focus:outline-none ${getFieldBorderClass(
-                                    draft.confidenceScores,
-                                    'price'
-                                  )}`}
-                                />
-
+                              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
                                 <button
-                                  onClick={() => handleSingleFillForm(draft)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-[#e3f6ec] hover:bg-[#d0eedb] text-[#2f8859] font-black text-xs shrink-0 flex items-center gap-1 border border-[#a2e0bd] transition-colors"
-                                  title="打开独立表单精细编辑或保存"
+                                  type="button"
+                                  onClick={() =>
+                                    setDrafts((prev) =>
+                                      prev.map((d, i) => (i === idx ? { ...d, editedRecordType: 'trip' } : d))
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                                    draft.editedRecordType !== 'expense'
+                                      ? 'bg-blue-600 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                  }`}
                                 >
-                                  <span>单条精修</span>
-                                  <ChevronRight className="w-3.5 h-3.5" />
+                                  ✈️ 交通行程
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDrafts((prev) =>
+                                      prev.map((d, i) =>
+                                        i === idx
+                                          ? { ...d, editedRecordType: 'expense', editedCategory: d.editedCategory || '住宿' }
+                                          : d
+                                      )
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                                    draft.editedRecordType === 'expense'
+                                      ? 'bg-amber-600 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                  }`}
+                                >
+                                  🏨 住宿/费用发票
                                 </button>
                               </div>
                             </div>
+
+                            {draft.editedRecordType === 'expense' ? (
+                              /* Expense / Accommodation Form Grid */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-amber-50/50 dark:bg-amber-950/20 p-3.5 rounded-2xl border border-amber-200 dark:border-amber-900/40">
+                                <div>
+                                  <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
+                                    费用类别
+                                  </label>
+                                  <select
+                                    value={draft.editedCategory || '住宿'}
+                                    onChange={(e) => {
+                                      const val = e.target.value as any;
+                                      setDrafts((prev) =>
+                                        prev.map((d, i) => (i === idx ? { ...d, editedCategory: val } : d))
+                                      );
+                                    }}
+                                    className="w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 focus:outline-none bg-white dark:bg-slate-900"
+                                  >
+                                    <option value="住宿">住宿费 (酒店/宾馆)</option>
+                                    <option value="餐饮">餐饮费</option>
+                                    <option value="市内交通">市内交通</option>
+                                    <option value="门票">景区门票</option>
+                                    <option value="其他">其他费用</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
+                                    酒店 / 商户名称
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="如: 汉庭酒店 / 亚朵酒店"
+                                    value={draft.editedMerchantName || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setDrafts((prev) =>
+                                        prev.map((d, i) => (i === idx ? { ...d, editedMerchantName: val } : d))
+                                      );
+                                    }}
+                                    className="w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 focus:outline-none bg-white dark:bg-slate-900"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
+                                    消费 / 开票日期
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={draft.editedDate}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setDrafts((prev) =>
+                                        prev.map((d, i) => (i === idx ? { ...d, editedDate: val } : d))
+                                      );
+                                    }}
+                                    className="w-full px-2 py-1.5 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 focus:outline-none bg-white dark:bg-slate-900"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
+                                    发票金额 (元)
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={draft.editedAmount}
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedAmount: val } : d))
+                                        );
+                                      }}
+                                      className="flex-1 px-2.5 py-1.5 rounded-xl text-xs font-black font-mono border border-amber-300 dark:border-amber-700 focus:outline-none bg-white dark:bg-slate-900"
+                                    />
+                                    <button
+                                      onClick={() => handleSingleFillForm(draft)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-amber-600 text-white font-black text-xs shrink-0 flex items-center gap-1 hover:bg-amber-700 transition-colors shadow-xs"
+                                    >
+                                      <span>单条保存</span>
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Trip Form Grid */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                {/* Transport & Train Number */}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                    交通工具 / 车次航班
+                                  </label>
+                                  <div className="flex gap-1.5">
+                                    <select
+                                      value={draft.editedTransport}
+                                      onChange={(e) => {
+                                        const val = e.target.value as TransportType;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedTransport: val } : d))
+                                        );
+                                      }}
+                                      className="w-24 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none bg-white dark:bg-slate-900 dark:text-slate-100"
+                                    >
+                                      <option value="高铁">高铁</option>
+                                      <option value="火车">火车</option>
+                                      <option value="飞机">飞机</option>
+                                      <option value="大巴">大巴</option>
+                                      <option value="的士">的士</option>
+                                      <option value="网约车">网约车</option>
+                                    </select>
+                                    <input
+                                      type="text"
+                                      placeholder="如 G1234"
+                                      value={draft.editedTrainNumber}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedTrainNumber: val } : d))
+                                        );
+                                      }}
+                                      className={`flex-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'trainNumber'
+                                      )}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Origin & Destination */}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                    起点 → 终点
+                                  </label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      placeholder="出发站"
+                                      value={draft.editedOrigin}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedOrigin: val } : d))
+                                        );
+                                      }}
+                                      className={`w-1/2 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'origin'
+                                      )}`}
+                                    />
+                                    <span className="text-slate-400 font-bold">→</span>
+                                    <input
+                                      type="text"
+                                      placeholder="到达站"
+                                      value={draft.editedDestination}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedDestination: val } : d))
+                                        );
+                                      }}
+                                      className={`w-1/2 px-2.5 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'destination'
+                                      )}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Date & Time */}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                    出发日期 & 发车时间
+                                  </label>
+                                  <div className="flex gap-1">
+                                    <input
+                                      type="date"
+                                      value={draft.editedDate}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedDate: val } : d))
+                                        );
+                                      }}
+                                      className={`flex-1 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'departureDate'
+                                      )}`}
+                                    />
+                                    <input
+                                      type="time"
+                                      value={draft.editedStartTime}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedStartTime: val } : d))
+                                        );
+                                      }}
+                                      className={`w-20 px-2 py-1.5 rounded-xl text-xs font-bold border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'departureTime'
+                                      )}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Price & Action */}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                    票价/金额 (元)
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={draft.editedAmount}
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        setDrafts((prev) =>
+                                          prev.map((d, i) => (i === idx ? { ...d, editedAmount: val } : d))
+                                        );
+                                      }}
+                                      className={`flex-1 px-2.5 py-1.5 rounded-xl text-xs font-black font-mono border focus:outline-none ${getFieldBorderClass(
+                                        draft.confidenceScores,
+                                        'price'
+                                      )}`}
+                                    />
+
+                                    <button
+                                      onClick={() => handleSingleFillForm(draft)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-[#e3f6ec] hover:bg-[#d0eedb] text-[#2f8859] font-black text-xs shrink-0 flex items-center gap-1 border border-[#a2e0bd] transition-colors"
+                                      title="打开独立表单精细编辑或保存"
+                                    >
+                                      <span>单条保存</span>
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          {/* INTERMEDIATE STATE & CONVERTED IMAGE DISPLAY AREA */}
-                          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border-2 border-slate-200 dark:border-slate-700/80 space-y-3">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                          {/* Requirement 3: INTERMEDIATE STATE & CONVERTED IMAGE DISPLAY AREA (Default collapsed, click to expand) */}
+                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border-2 border-slate-200 dark:border-slate-700/80">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedIntermediateIds((prev) =>
+                                  prev.includes(draft.fileId)
+                                    ? prev.filter((id) => id !== draft.fileId)
+                                    : [...prev, draft.fileId]
+                                )
+                              }
+                              className="w-full flex items-center justify-between gap-2 text-left group"
+                            >
                               <div className="flex items-center gap-2">
-                                <Eye className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                                <Eye className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">
                                   中间状态与 PDF 转换渲染效果展示
                                 </span>
                                 {draft.convertedImageResolution && (
@@ -623,128 +821,126 @@ export const TicketOcrModal: React.FC = () => {
                                 )}
                               </div>
 
-                              <button
-                                onClick={() =>
-                                  setExpandedDetailsId(
-                                    expandedDetailsId === draft.fileId ? null : draft.fileId
-                                  )
-                                }
-                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                              >
+                              <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:underline">
                                 <span>
-                                  {expandedDetailsId === draft.fileId ? '收起中间流程与文本' : '查看转换步骤与文本层'}
+                                  {expandedIntermediateIds.includes(draft.fileId)
+                                    ? '折叠收起渲染效果'
+                                    : '展开查看渲染效果图与转换步骤'}
                                 </span>
-                                {expandedDetailsId === draft.fileId ? (
-                                  <ChevronDown className="w-3.5 h-3.5" />
+                                {expandedIntermediateIds.includes(draft.fileId) ? (
+                                  <ChevronUp className="w-4 h-4" />
                                 ) : (
-                                  <ChevronRight className="w-3.5 h-3.5" />
+                                  <ChevronDown className="w-4 h-4" />
                                 )}
-                              </button>
-                            </div>
+                              </div>
+                            </button>
 
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                              {/* Left Thumbnail with Click to Zoom */}
-                              {draft.previewUrl ? (
-                                <div className="md:col-span-5 relative group overflow-hidden rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center min-h-[100px] max-h-[140px] cursor-pointer shadow-xs"
-                                  onClick={() => {
-                                    setZoomLevel(1);
-                                    setPreviewModal({
-                                      url: draft.previewUrl || '',
-                                      title: `PDF 中间转换渲染效果 - ${draft.fileName}`,
-                                      resolution: draft.convertedImageResolution,
-                                      textLines: draft.pdfTextLines,
-                                    });
-                                  }}
-                                >
-                                  <img
-                                    src={draft.previewUrl}
-                                    alt="Intermediate Rendering Preview"
-                                    className="object-contain w-full h-full max-h-[130px] p-1 transition-transform group-hover:scale-105"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-extrabold text-xs">
-                                    <Maximize2 className="w-4 h-4" />
-                                    <span>点击放大查看 3.0x 高清转换图</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="md:col-span-5 p-4 text-center rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 text-xs font-bold">
-                                  暂无中间渲染图
-                                </div>
-                              )}
-
-                              {/* Right Step Pipeline */}
-                              <div className="md:col-span-7 space-y-1.5">
-                                <div className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                  <Layers className="w-3.5 h-3.5" />
-                                  <span>PDF 转换与 OCR 识别流 (纯白背景 + CMap 解码)：</span>
-                                </div>
-
-                                <div className="space-y-1">
-                                  {draft.processingSteps && draft.processingSteps.length > 0 ? (
-                                    draft.processingSteps.map((step, stIdx) => (
-                                      <div
-                                        key={`step-${stIdx}-${step.stepName}`}
-                                        className="text-[11px] font-bold flex items-center justify-between px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                                      >
-                                        <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                          {step.stepName}
-                                        </span>
-                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
-                                          {step.detail}
-                                        </span>
+                            {/* Collapsible Content */}
+                            {expandedIntermediateIds.includes(draft.fileId) && (
+                              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                  {/* Left Thumbnail with Click to Zoom */}
+                                  {draft.previewUrl ? (
+                                    <div
+                                      className="md:col-span-5 relative group overflow-hidden rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center min-h-[100px] max-h-[140px] cursor-pointer shadow-xs"
+                                      onClick={() => {
+                                        setZoomLevel(1);
+                                        setPreviewModal({
+                                          url: draft.previewUrl || '',
+                                          title: `PDF 中间转换渲染效果 - ${draft.fileName}`,
+                                          resolution: draft.convertedImageResolution,
+                                          textLines: draft.pdfTextLines,
+                                        });
+                                      }}
+                                    >
+                                      <img
+                                        src={draft.previewUrl}
+                                        alt="Intermediate Rendering Preview"
+                                        className="object-contain w-full h-full max-h-[130px] p-1 transition-transform group-hover:scale-105"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-extrabold text-xs">
+                                        <Maximize2 className="w-4 h-4" />
+                                        <span>点击放大查看 3.0x 高清转换图</span>
                                       </div>
-                                    ))
+                                    </div>
                                   ) : (
-                                    <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                      ✅ 已通过高精度 Canvas (Scale 3.0x) 将 PDF 转为纯白背景 Jpeg 图片，中文字体渲染清晰。
+                                    <div className="md:col-span-5 p-4 text-center rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 text-xs font-bold">
+                                      暂无中间渲染图
                                     </div>
                                   )}
+
+                                  {/* Right Step Pipeline */}
+                                  <div className="md:col-span-7 space-y-1.5">
+                                    <div className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5" />
+                                      <span>PDF 转换与 OCR 识别流 (纯白背景 + CMap 解码)：</span>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      {draft.processingSteps && draft.processingSteps.length > 0 ? (
+                                        draft.processingSteps.map((step, stIdx) => (
+                                          <div
+                                            key={`step-${stIdx}-${step.stepName}`}
+                                            className="text-[11px] font-bold flex items-center justify-between px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                                          >
+                                            <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                              {step.stepName}
+                                            </span>
+                                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
+                                              {step.detail}
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                          ✅ 已通过高精度 Canvas (Scale 3.0x) 将 PDF 转为纯白背景 Jpeg 图片，中文字体渲染清晰。
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setZoomLevel(1);
+                                        setPreviewModal({
+                                          url: draft.previewUrl || '',
+                                          title: `PDF 中间转换渲染效果 - ${draft.fileName}`,
+                                          resolution: draft.convertedImageResolution,
+                                          textLines: draft.pdfTextLines,
+                                        });
+                                      }}
+                                      className="w-full mt-1 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-1.5 transition-colors"
+                                    >
+                                      <FileSearch className="w-3.5 h-3.5" />
+                                      <span>全屏检视 PDF 转换渲染效果图与嵌入文本</span>
+                                    </button>
+                                  </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setZoomLevel(1);
-                                    setPreviewModal({
-                                      url: draft.previewUrl || '',
-                                      title: `PDF 中间转换渲染效果 - ${draft.fileName}`,
-                                      resolution: draft.convertedImageResolution,
-                                      textLines: draft.pdfTextLines,
-                                    });
-                                  }}
-                                  className="w-full mt-1 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-1.5 transition-colors"
-                                >
-                                  <FileSearch className="w-3.5 h-3.5" />
-                                  <span>全屏检视 PDF 转换渲染效果图与嵌入文本</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Collapsible PDF Raw Text Layer Section */}
-                            {expandedDetailsId === draft.fileId && (
-                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
-                                <div className="flex items-center justify-between text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                                  <span>PDF 矢量嵌入中文字符串 ({draft.pdfTextLines?.length || 0} 行)</span>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    解析可以直接从 PDF 提取这些字符并辅助补全
-                                  </span>
+                                {/* Collapsible PDF Raw Text Layer Section */}
+                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedDetailsId(
+                                        expandedDetailsId === draft.fileId ? null : draft.fileId
+                                      )
+                                    }
+                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                  >
+                                    <span>
+                                      {expandedDetailsId === draft.fileId
+                                        ? '收起文本层字符串'
+                                        : '查看 PDF 矢量嵌入文本层'}
+                                    </span>
+                                    {expandedDetailsId === draft.fileId ? (
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
                                 </div>
-
-                                {draft.pdfTextLines && draft.pdfTextLines.length > 0 ? (
-                                  <div className="p-3 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[11px] max-h-40 overflow-y-auto space-y-1 border border-slate-800">
-                                    {draft.pdfTextLines.map((line, lIdx) => (
-                                      <div key={`pdf-line-${lIdx}`} className="leading-tight">
-                                        <span className="text-slate-500 mr-2">[{lIdx + 1}]</span>
-                                        {line}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold">
-                                    该 PDF 内部未检出可提取的矢量文本层（可能是扫描件/纯图片 PDF），已全部转为 300DPI 图像并依靠 OCR/AI Vision 识别。
-                                  </div>
-                                )}
                               </div>
                             )}
                           </div>

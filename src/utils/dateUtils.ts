@@ -50,6 +50,17 @@ export function formatDayHeader(date: Date): string {
   return format(date, 'yyyy年MM月dd日 EEEE', { locale: zhCN });
 }
 
+export function sortTripsByStartTime<T extends { startTime?: string; createdAt?: number }>(trips: T[]): T[] {
+  return [...trips].sort((a, b) => {
+    const timeA = a.startTime && a.startTime.trim() ? a.startTime.trim() : '99:99';
+    const timeB = b.startTime && b.startTime.trim() ? b.startTime.trim() : '99:99';
+    if (timeA !== timeB) {
+      return timeA.localeCompare(timeB);
+    }
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
 export interface CalendarDayCell {
   date: Date;
   dateStr: string;

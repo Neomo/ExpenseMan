@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { formatChineseDate } from '../../utils/dateUtils';
+import { formatChineseDate, sortTripsByStartTime } from '../../utils/dateUtils';
 import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import {
   Plane,
@@ -14,6 +14,9 @@ import {
   Maximize2,
   Repeat,
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from 'lucide-react';
 
 export const CalendarRightPanel: React.FC = () => {
@@ -26,13 +29,17 @@ export const CalendarRightPanel: React.FC = () => {
     openDateDetail,
     deleteTrip,
     deleteExpense,
+    setSelectedDate,
   } = useAppStore();
+
+  const [isChainPanelExpanded, setIsChainPanelExpanded] = useState(false);
 
   const allChains = useMemo(() => analyzeTripChains(trips), [trips]);
   const activeChain = useMemo(() => getChainForDate(allChains, selectedDate), [allChains, selectedDate]);
   const activeTheme = activeChain ? CHAIN_THEMES[activeChain.themeIndex % CHAIN_THEMES.length] : null;
 
-  const dayTrips = trips.filter((t) => t.date === selectedDate);
+  // Filter dayTrips and sort by departure time (earliest to latest)
+  const dayTrips = sortTripsByStartTime(trips.filter((t) => t.date === selectedDate));
   const dayExpenses = expenses.filter((e) => e.date === selectedDate);
 
   const tripSum = dayTrips.reduce((sum, t) => sum + t.amount, 0);
@@ -67,28 +74,42 @@ export const CalendarRightPanel: React.FC = () => {
         </button>
       </div>
 
-      {/* Belonging Round-Trip Chain Alert Card */}
-      {activeChain && activeTheme && (
-        <div className={`p-3 rounded-2xl border ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-1.5 shadow-2xs`}>
+      {/* Requirement 3: 智能闭环解析 区域，仅显示当天相关的闭环，不显示所有闭环 */}
+      {activeChain && activeTheme ? (
+        <div className={`p-3.5 rounded-2xl border-2 ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-2 shadow-xs transition-all`}>
           <div className="flex items-center justify-between">
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
-              <Repeat className="w-3 h-3" />
-              <span>所属完整闭环出差</span>
+            <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-lg ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
+              <Repeat className="w-3.5 h-3.5" />
+              <span>当日所属闭环行程</span>
             </span>
-            <span className="text-[10px] font-mono font-bold text-slate-500">
+            <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300">
               {activeChain.startDate} ~ {activeChain.endDate} ({activeChain.totalDays}天)
             </span>
           </div>
 
-          <p className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-1 flex-wrap pt-0.5">
-            <span>{activeChain.cities.join(' ➔ ')}</span>
-          </p>
-
-          <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-600 dark:text-slate-400 pt-1 border-t border-black/5 dark:border-white/10">
-            <span>全程包含 {activeChain.legs.length} 段交通</span>
-            <span className="font-mono text-[#d65129] dark:text-amber-300 font-black">
-              闭环交通费: ¥{activeChain.totalCost.toFixed(1)}
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400">
+              城市往返路线：
             </span>
+            <p className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-1 flex-wrap">
+              <span>{activeChain.cities.join(' ➔ ')}</span>
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-400 pt-1.5 border-t border-black/5 dark:border-white/10">
+            <span>涵盖 {activeChain.legs.length} 段交通</span>
+            <span className="font-mono text-[#d65129] dark:text-amber-300 font-black text-xs">
+              闭环交通费: ¥{activeChain.totalCost.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-500">
+              <Repeat className="w-3.5 h-3.5" />
+            </div>
+            <span>当日闭环状态：<span className="font-normal text-slate-400">无相关闭环行程</span></span>
           </div>
         </div>
       )}

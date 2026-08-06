@@ -12,9 +12,11 @@ import {
   Calendar as CalendarIcon,
   DollarSign,
   Repeat,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { formatChineseDate } from '../../utils/dateUtils';
+import { formatChineseDate, sortTripsByStartTime } from '../../utils/dateUtils';
 import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import { TripItem, ExpenseItem } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -38,14 +40,16 @@ export const DateDetailModal: React.FC = () => {
     title: string;
   } | null>(null);
 
+  const [isChainExpanded, setIsChainExpanded] = useState(false);
+
   const allChains = useMemo(() => analyzeTripChains(trips), [trips]);
   const activeChain = useMemo(() => getChainForDate(allChains, selectedDate), [allChains, selectedDate]);
   const activeTheme = activeChain ? CHAIN_THEMES[activeChain.themeIndex % CHAIN_THEMES.length] : null;
 
   if (!dateDetailOpen) return null;
 
-  // Filter items for selectedDate
-  const dayTrips = trips.filter((t) => t.date === selectedDate);
+  // Filter items for selectedDate and sort dayTrips by startTime (earliest to latest)
+  const dayTrips = sortTripsByStartTime(trips.filter((t) => t.date === selectedDate));
   const dayExpenses = expenses.filter((e) => e.date === selectedDate);
 
   // Subtotals
@@ -101,29 +105,48 @@ export const DateDetailModal: React.FC = () => {
 
             {/* Scrollable Content Body */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              {/* Active Trip Chain Banner */}
+              {/* Active Trip Chain Banner (Collapsible) */}
               {activeChain && activeTheme && (
-                <div className={`p-4 rounded-2xl border ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-2 shadow-xs`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-black px-2.5 py-0.5 rounded-lg ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
-                      <Repeat className="w-3.5 h-3.5" />
-                      <span>所属完整闭环出差路线</span>
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">
-                      {activeChain.startDate} ~ {activeChain.endDate} ({activeChain.totalDays}天)
-                    </span>
+                <div className={`p-3.5 rounded-2xl border ${activeTheme.borderLight} ${activeTheme.borderDark} ${activeTheme.bgLight} ${activeTheme.bgDark} space-y-2 shadow-xs transition-all`}>
+                  <div
+                    onClick={() => setIsChainExpanded(!isChainExpanded)}
+                    className="flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-black px-2.5 py-0.5 rounded-lg ${activeTheme.badgeBg} flex items-center gap-1 shadow-2xs`}>
+                        <Repeat className="w-3.5 h-3.5" />
+                        <span>智能闭环路线</span>
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
+                        {activeChain.startDate} ~ {activeChain.endDate}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs font-extrabold text-indigo-600 dark:text-indigo-400 group-hover:underline">
+                      <span>{isChainExpanded ? '收起闭环' : '展开闭环解析'}</span>
+                      {isChainExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
                   </div>
 
-                  <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap pt-0.5">
-                    <span>{activeChain.cities.join(' ➔ ')}</span>
-                  </p>
+                  {isChainExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="pt-2 space-y-2 border-t border-black/5 dark:border-white/10"
+                    >
+                      <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                        <span>{activeChain.cities.join(' ➔ ')}</span>
+                      </p>
 
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 pt-1.5 border-t border-black/5 dark:border-white/10">
-                    <span>全程涵盖 {activeChain.legs.length} 段连贯交通行程</span>
-                    <span className="font-mono text-[#d65129] dark:text-amber-300 font-black text-sm">
-                      闭环总交通费: ¥{activeChain.totalCost.toFixed(2)}
-                    </span>
-                  </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 pt-1">
+                        <span>全程涵盖 {activeChain.legs.length} 段连贯交通行程 (共{activeChain.totalDays}天)</span>
+                        <span className="font-mono text-[#d65129] dark:text-amber-300 font-black text-sm">
+                          闭环总交通费: ¥{activeChain.totalCost.toFixed(2)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               )}
               {/* Section 1: Travel Trips */}

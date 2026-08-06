@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { getMonthDaysGrid } from '../../utils/dateUtils';
+import { getMonthDaysGrid, sortTripsByStartTime } from '../../utils/dateUtils';
 import { analyzeTripChains, getChainForDate, CHAIN_THEMES } from '../../utils/tripAnalyzer';
 import { Plane, Receipt, MapPin, Plus, Repeat } from 'lucide-react';
 
@@ -49,7 +49,7 @@ export const MonthView: React.FC = () => {
       {/* Days Grid */}
       <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-[#eaf4ed] dark:divide-slate-800/80">
         {daysGrid.map((cell, idx) => {
-          const dayTrips = tripsByDate[cell.dateStr] || [];
+          const dayTrips = sortTripsByStartTime(tripsByDate[cell.dateStr] || []);
           const dayExpenses = expensesByDate[cell.dateStr] || [];
 
           const tripSum = dayTrips.reduce((sum, t) => sum + t.amount, 0);

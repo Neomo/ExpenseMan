@@ -77,6 +77,7 @@ interface AppState {
   closeOcrModal: () => void;
   saveOcrConfig: (config: OcrConfig) => Promise<void>;
   batchAddTrips: (newTrips: TripItem[]) => Promise<void>;
+  batchAddExpenses: (newExpenses: ExpenseItem[]) => Promise<void>;
   processOcrFiles: (files: FileList | File[]) => Promise<void>;
   setOcrDrafts: (drafts: DraftTrip[] | ((prev: DraftTrip[]) => DraftTrip[])) => void;
   clearOcrDrafts: () => void;
@@ -195,18 +196,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await processTicketOcr(file, get().ocrConfig);
 
       const existingTrips = get().trips;
+      const existingExpenses = get().expenses;
 
-      const isDup = existingTrips.some((existing) => {
-        const sameTrain = (result.trainNumber || '').trim().toLowerCase() === (existing.trainNumber || '').trim().toLowerCase();
-        const sameDate = (result.departureDate || '') === existing.date;
-        const sameOrigin = (result.origin || '').trim().toLowerCase() === (existing.origin || '').trim().toLowerCase();
-        const sameDest = (result.destination || '').trim().toLowerCase() === (existing.destination || '').trim().toLowerCase();
-        const sameAmount = Math.abs((result.price || 0) - existing.amount) < 0.01;
-        return sameTrain && sameDate && sameOrigin && sameDest && sameAmount;
-      });
+      const isExpenseDraft = result.recordType === 'expense' || result.expenseCategory === '住宿';
+
+      const isDup = isExpenseDraft
+        ? existingExpenses.some((existing) => {
+            const sameCategory = existing.category === (result.expenseCategory || '住宿');
+            const sameDate = existing.date === result.departureDate;
+            const sameAmount = Math.abs(existing.amount - (result.price || 0)) < 0.01;
+            return sameCategory && sameDate && sameAmount;
+          })
+        : existingTrips.some((existing) => {
+            const sameTrain = (result.trainNumber || '').trim().toLowerCase() === (existing.trainNumber || '').trim().toLowerCase();
+            const sameDate = (result.departureDate || '') === existing.date;
+            const sameOrigin = (result.origin || '').trim().toLowerCase() === (existing.origin || '').trim().toLowerCase();
+            const sameDest = (result.destination || '').trim().toLowerCase() === (existing.destination || '').trim().toLowerCase();
+            const sameAmount = Math.abs((result.price || 0) - existing.amount) < 0.01;
+            return sameTrain && sameDate && sameOrigin && sameDest && sameAmount;
+          });
 
       const draft: DraftTrip = {
         ...result,
+        editedRecordType: isExpenseDraft ? 'expense' : (result.recordType || 'trip'),
+        editedCategory: (result.expenseCategory as any) || '住宿',
+        editedMerchantName: result.merchantName || '',
         editedTrainNumber: result.trainNumber || '',
         editedTransport: result.transportType || '火车',
         editedOrigin: result.origin || '',
@@ -214,7 +228,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         editedDate: result.departureDate || new Date().toISOString().split('T')[0],
         editedStartTime: result.departureTime || '',
         editedAmount: result.price || 0,
-        editedRemarks: result.seatInfo ? `席别: ${result.seatInfo}` : '',
+        editedRemarks: result.merchantName
+          ? `商户/酒店: ${result.merchantName}${result.itemName ? ` (${result.itemName})` : ''}`
+          : result.seatInfo
+          ? `席别: ${result.seatInfo}`
+          : '',
         isDuplicate: isDup,
       };
 
@@ -234,11 +252,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (dupCount > 0) {
       get().showToast(
-        `处理完成 ${validFiles.length} 张票据，其中检测到 ${dupCount} 张与现有数据完全重复(车次/日期/起止/费用相同)`,
+        `处理完成 ${validFiles.length} 张票据/发票，其中检测到 ${dupCount} 张与现有数据重复`,
         'info'
       );
     } else if (successCount > 0) {
-      get().showToast(`已成功识别 ${successCount} 张票据，为您弹出一键核对保存界面！`, 'success');
+      get().showToast(`已成功识别 ${successCount} 张票据/发票，为您弹出一键核对保存界面！`, 'success');
     } else {
       get().showToast('票据处理完毕，请在弹窗中进行核对', 'info');
     }
@@ -281,7 +299,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       if (skippedDuplicates > 0) {
         get().showToast(
-          `成功导入 ${uniqueTrips.length} 条记录（跳过 ${skippedDuplicates} 条在车次、日期、起点、终点、费用维度均相同的重复数据）`,
+          `成功导入 ${uniqueTrips.length} 条行程记录（跳过 ${skippedDuplicates} 条在【车次、日期、起点、终点、费用】维度均相同的重复数据）`,
           'info'
         );
       } else {
@@ -290,7 +308,52 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       set({ ocrModalOpen: false, ocrDrafts: [] });
       get().showToast(
-        `检测到 ${newTrips.length} 条识别数据与现有数据在【车次、日期、起点、终点、费用】5个维度完全一致，未重复导入！`,
+        `检测到 ${newTrips.length} 条识别数据与现有数据在【车次、日期、起点、终点、费用】维度完全一致，未重复导入！`,
+        'info'
+      );
+    }
+  },
+
+  batchAddExpenses: async (newExpenses: ExpenseItem[]) => {
+    const existingExpenses = get().expenses;
+    const uniqueExpenses: ExpenseItem[] = [];
+    let skippedDuplicates = 0;
+
+    for (const exp of newExpenses) {
+      const isDup = existingExpenses.some((existing) => {
+        const sameCategory = exp.category === existing.category;
+        const sameDate = exp.date === existing.date;
+        const sameAmount = Math.abs(exp.amount - existing.amount) < 0.01;
+        const sameDesc = (exp.description || '').trim() === (existing.description || '').trim();
+        return sameCategory && sameDate && sameAmount && sameDesc;
+      });
+
+      if (isDup) {
+        skippedDuplicates++;
+      } else {
+        uniqueExpenses.push(exp);
+      }
+    }
+
+    if (uniqueExpenses.length > 0) {
+      for (const exp of uniqueExpenses) {
+        await db.saveExpense(exp);
+      }
+      const expenses = await db.getAllExpenses();
+      set({ expenses, ocrModalOpen: false, ocrDrafts: [] });
+
+      if (skippedDuplicates > 0) {
+        get().showToast(
+          `成功导入 ${uniqueExpenses.length} 条费用记录（跳过 ${skippedDuplicates} 条重复费用数据）`,
+          'info'
+        );
+      } else {
+        get().showToast(`已批量保存 ${uniqueExpenses.length} 条费用记录`, 'success');
+      }
+    } else {
+      set({ ocrModalOpen: false, ocrDrafts: [] });
+      get().showToast(
+        `检测到 ${newExpenses.length} 条费用识别数据与现有数据完全一致，未重复导入！`,
         'info'
       );
     }
@@ -313,7 +376,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setCurrentViewMode: (mode) => set({ currentViewMode: mode }),
-  setSelectedDate: (dateStr) => set({ selectedDate: dateStr }),
+  setSelectedDate: (dateStr) => {
+    if (dateStr) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const focusDate = new Date(y, m, d);
+          set({ selectedDate: dateStr, calendarFocusDate: focusDate });
+          return;
+        }
+      }
+    }
+    set({ selectedDate: dateStr });
+  },
   setCalendarFocusDate: (date) => set({ calendarFocusDate: date }),
 
   openDateDetail: (dateStr) => set({ selectedDate: dateStr, dateDetailOpen: true }),

@@ -133,19 +133,26 @@ async function startServer() {
         });
       }
 
-      let promptText = `你是一个精通中国交通票据/行程单的 AI 多模态视觉 OCR 识别专家。
-请仔细查看这张票据图片，精准提取票面上打印的关键行程信息，并按 JSON 格式输出。
+      let promptText = `你是一个精通中国交通票据/行程单以及各类报销发票（特别是住宿费/酒店发票）的 AI 多模态视觉 OCR 识别专家。
+请仔细查看这张票据/发票图片，精准提取票面上打印的关键行程或发票信息，并按 JSON 格式输出。
 
 提取规则与核心字段要求：
-1. origin (起点/始发站): 必须提取出发站或始发站名称（通常在票面左上方/左侧），例如 "武汉"、"汉口"、"北京南" 等。【重要】：即便票面文字被换行拆分（如 "武汉\n站"、"武汉\n 站"）或与 "站" 字分开，也必须精准提取站名 "武汉"（切记去除末尾的"站"或"机场"字，严禁误提取为 "电子客票"、"行程单" 等标题词）。
-2. destination (终点/到达站): 必须提取到达站名称（通常在票面右上方/右侧），例如 "咸宁北"、"宜昌东" 等。【重要】：即便票面文字被换行拆分（如 "咸宁北\n站"、"咸宁北\n 站"）或与 "站" 字分开，也必须精准提取站名 "咸宁北"（切记去除末尾的"站"或"机场"字）。
-3. trainNumber (车次/航班号): 如 G1234, D5678, K102, CA1831, MU5101 等。
-4. transportType: "高铁", "火车", "飞机", "大巴", "的士", "网约车" 等。
-5. departureDate: 乘车日期/出发日期，格式统一为 YYYY-MM-DD (如 2026-07-16)。【重要】：即便票面上的日期被拆分为多行或包含空格（如 "2026\n年\n07\n月\n22\n日" 或 "2026 年 07 月 22 日"），也必须将其合并组合解析为标准的 YYYY-MM-DD 格式（如 2026-07-22）。切勿遗漏月份或日期，严禁将票面右下角或底部标注的 "开票日期"、"填开日期"、"发票打印日期" 误当作 departureDate！
-6. departureTime: 出发时间/发车时间，24小时制 HH:mm (如 08:30)。
-7. price: 票价/车费金额 (纯数字，如 108.5)。
-8. seatInfo: 座位席别/车厢号/座位号 (如 "二等座 05车12A号"、"经济舱" 等)。
-9. confidenceScores: 各关键字段识别置信度 (0.0 - 1.0 的浮点数)。`;
+1. recordType: 单据类型。
+   - "trip": 交通客票行程单 (火车票、飞机票行程单、大巴票等)
+   - "expense": 日常报销发票 (住宿发票、餐饮发票等)
+   【核心判定法则】：当发票的销售方名称/购买方/商户名称包含 "酒店"、"宾馆"、"客栈"、"饭店"、"民宿"、"大酒店"、"旅馆"，且货物或应税劳务/服务项目名称包含 "住宿"、"住宿费"、"房费"、"客房"、"*住宿服务*" 时，务必将 recordType 设为 "expense"，并将 expenseCategory 设为 "住宿"！
+2. expenseCategory: 如果 recordType 为 "expense"，填写费用类型，如 "住宿"、"餐饮"、"门票" 等。
+3. merchantName: 商户/开票单位/酒店名称 (如 "亚朵酒店"、"汉庭酒店")。
+4. itemName: 货物或服务项目名称 (如 "*住宿服务*住宿费")。
+5. origin (起点/始发站): 交通票据的出发站名 (切记去除末尾"站"或"机场")。
+6. destination (终点/到达站): 交通票据的到达站名 (切记去除末尾"站"或"机场")。
+7. trainNumber (车次/航班号): 如 G1234, D5678, K102, CA1831 等。
+8. transportType: "高铁", "火车", "飞机", "大巴", "的士", "网约车" 等。
+9. departureDate: 乘车日期/发票开票或入住日期，格式统一为 YYYY-MM-DD (如 2026-07-16)。
+10. departureTime: 出发时间，24小时制 HH:mm (如 08:30)。
+11. price: 票价/发票总金额 (纯数字，如 358.0)。
+12. seatInfo: 座位席别/车厢号/座位号。
+13. confidenceScores: 各关键字段识别置信度 (0.0 - 1.0 的浮点数)。`;
 
       if (pdfTextLines && Array.isArray(pdfTextLines) && pdfTextLines.length > 0) {
         promptText += `\n\n【辅助验证文本层数据】该文件来源于 PDF 矢量转换，以下是从其矢量文本层提取的原始字符串（供辅助比对校对，注意以图片视觉呈现为最高准则）：\n${pdfTextLines.slice(0, 35).join(' | ')}`;
@@ -176,6 +183,10 @@ async function startServer() {
                 type: Type.OBJECT,
                 properties: {
                   isValidTicket: { type: Type.BOOLEAN },
+                  recordType: { type: Type.STRING },
+                  expenseCategory: { type: Type.STRING },
+                  merchantName: { type: Type.STRING },
+                  itemName: { type: Type.STRING },
                   trainNumber: { type: Type.STRING },
                   transportType: { type: Type.STRING },
                   origin: { type: Type.STRING },
