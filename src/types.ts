@@ -1,6 +1,12 @@
-export type TransportType = '的士' | '网约车' | '大巴' | '火车' | '飞机' | string;
+export type TransportType = '高铁' | '的士' | '网约车' | '大巴' | '火车' | '飞机' | string;
 
-export type ExpenseCategoryType = '物品' | '饮品' | '水果' | '餐饮' | '住宿' | '通讯' | '门票' | '娱乐' | string;
+export type ExpenseCategoryType = '交通' | '餐饮' | '住宿' | '物品' | '饮品' | '水果' | '礼物' | '补贴' | '其他' | string;
+
+export interface AllowanceConfig {
+  homeCity: string;
+  allowanceRate: number;
+  autoAddAllowance: boolean;
+}
 
 export interface TripItem {
   id: string;

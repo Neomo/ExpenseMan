@@ -19,6 +19,9 @@ import {
   ShieldCheck,
   Save,
   Layers,
+  Coins,
+  MapPin,
+  Zap,
 } from 'lucide-react';
 import { TicketRegionEditorModal } from '../OCR/TicketRegionEditorModal';
 import { DEFAULT_RAILWAY_TEMPLATE } from '../../utils/ticketOcr';
@@ -59,7 +62,16 @@ export const DataSettingsView: React.FC = () => {
     expenses,
     ocrConfig,
     saveOcrConfig,
+    allowanceConfig,
+    updateAllowanceConfig,
+    generateTripAllowances,
   } = useAppStore();
+
+  const [allowanceForm, setAllowanceForm] = useState({
+    homeCity: allowanceConfig?.homeCity || '武汉',
+    allowanceRate: allowanceConfig?.allowanceRate || 80,
+    autoAddAllowance: allowanceConfig?.autoAddAllowance !== false,
+  });
 
   const [ocrForm, setOcrForm] = useState<OcrConfig>({
     provider: ocrConfig?.provider || 'system_gemini',
@@ -245,6 +257,88 @@ export const DataSettingsView: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Section 1.5: Travel Subsidy / Allowance Settings */}
+        <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Coins className="w-5 h-5 text-amber-500" />
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                出差补贴与异地行程设置
+              </h3>
+            </div>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              自动闭环检测
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            系统可自动检测离开常驻本地城市的【闭环差旅行程】，并在出差的全周期（含往返和中间出差留宿日期）中按日补贴标准自动生成补贴费用。
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                常驻本地城市
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={allowanceForm.homeCity}
+                  onChange={(e) => setAllowanceForm((prev) => ({ ...prev, homeCity: e.target.value }))}
+                  onBlur={() => updateAllowanceConfig({ homeCity: allowanceForm.homeCity })}
+                  placeholder="例如：武汉"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                补贴标准金额 (元/天)
+              </label>
+              <div className="relative">
+                <span className="text-xs text-slate-400 absolute left-3 top-2.5 font-semibold">¥</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  value={allowanceForm.allowanceRate}
+                  onChange={(e) => setAllowanceForm((prev) => ({ ...prev, allowanceRate: Number(e.target.value) }))}
+                  onBlur={() => updateAllowanceConfig({ allowanceRate: Number(allowanceForm.allowanceRate) })}
+                  placeholder="例如：80"
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={allowanceForm.autoAddAllowance}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setAllowanceForm((prev) => ({ ...prev, autoAddAllowance: checked }));
+                  updateAllowanceConfig({ autoAddAllowance: checked });
+                }}
+                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 dark:border-slate-700"
+              />
+              <span>检测到异地闭环行程时自动添加补贴</span>
+            </label>
+
+            <button
+              onClick={() => generateTripAllowances(true)}
+              className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>一键计算并补全异地补贴</span>
+            </button>
           </div>
         </div>
 

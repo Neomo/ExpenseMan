@@ -63,35 +63,41 @@ export function getDB() {
 
 // Initial default categories
 export const DEFAULT_TRANSPORT_CATEGORIES: CustomCategory[] = [
-  { id: 'trans-1', name: '的士', type: 'transport', isDefault: true },
-  { id: 'trans-2', name: '网约车', type: 'transport', isDefault: true },
-  { id: 'trans-3', name: '大巴', type: 'transport', isDefault: true },
-  { id: 'trans-4', name: '火车', type: 'transport', isDefault: true },
-  { id: 'trans-5', name: '飞机', type: 'transport', isDefault: true },
+  { id: 'trans-1', name: '高铁', type: 'transport', isDefault: true },
+  { id: 'trans-2', name: '的士', type: 'transport', isDefault: true },
+  { id: 'trans-3', name: '网约车', type: 'transport', isDefault: true },
+  { id: 'trans-4', name: '大巴', type: 'transport', isDefault: true },
+  { id: 'trans-5', name: '火车', type: 'transport', isDefault: true },
+  { id: 'trans-6', name: '飞机', type: 'transport', isDefault: true },
 ];
 
 export const DEFAULT_EXPENSE_CATEGORIES: CustomCategory[] = [
-  { id: 'exp-1', name: '餐饮', type: 'expense', isDefault: true },
-  { id: 'exp-2', name: '住宿', type: 'expense', isDefault: true },
-  { id: 'exp-3', name: '物品', type: 'expense', isDefault: true },
-  { id: 'exp-4', name: '饮品', type: 'expense', isDefault: true },
-  { id: 'exp-5', name: '水果', type: 'expense', isDefault: true },
-  { id: 'exp-6', name: '通讯', type: 'expense', isDefault: true },
-  { id: 'exp-7', name: '门票', type: 'expense', isDefault: true },
-  { id: 'exp-8', name: '娱乐', type: 'expense', isDefault: true },
+  { id: 'exp-1', name: '交通', type: 'expense', isDefault: true },
+  { id: 'exp-2', name: '餐饮', type: 'expense', isDefault: true },
+  { id: 'exp-3', name: '住宿', type: 'expense', isDefault: true },
+  { id: 'exp-4', name: '物品', type: 'expense', isDefault: true },
+  { id: 'exp-5', name: '饮品', type: 'expense', isDefault: true },
+  { id: 'exp-6', name: '水果', type: 'expense', isDefault: true },
+  { id: 'exp-7', name: '礼物', type: 'expense', isDefault: true },
+  { id: 'exp-8', name: '补贴', type: 'expense', isDefault: true },
+  { id: 'exp-9', name: '其他', type: 'expense', isDefault: true },
 ];
 
-// Seed initial default categories if empty
+// Seed initial default categories if empty or missing
 export async function initDefaultData() {
   const db = await getDB();
   const existingCats = await db.getAll('customCategories');
-  if (existingCats.length === 0) {
-    const tx = db.transaction('customCategories', 'readwrite');
-    for (const cat of [...DEFAULT_TRANSPORT_CATEGORIES, ...DEFAULT_EXPENSE_CATEGORIES]) {
+  const allDefaults = [...DEFAULT_TRANSPORT_CATEGORIES, ...DEFAULT_EXPENSE_CATEGORIES];
+
+  const existingSet = new Set(existingCats.map((c) => `${c.type}:${c.name}`));
+
+  const tx = db.transaction('customCategories', 'readwrite');
+  for (const cat of allDefaults) {
+    if (!existingSet.has(`${cat.type}:${cat.name}`)) {
       await tx.store.put(cat);
     }
-    await tx.done;
   }
+  await tx.done;
 }
 
 // Trips DB Operations

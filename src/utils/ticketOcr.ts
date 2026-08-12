@@ -647,6 +647,49 @@ export function detectAccommodationInvoice(text: string): { isAccommodation: boo
 }
 
 /**
+ * Detects if a text or invoice contains transport service provider (滴滴/出行) or item names (交通运输/客运服务)
+ */
+export function detectTransportInvoice(
+  text: string,
+  merchantName?: string,
+  itemName?: string
+): { isTransportInvoice: boolean; merchantName?: string; itemName?: string } {
+  const fullText = `${text || ''} ${merchantName || ''} ${itemName || ''}`;
+
+  const hasTransportMerchant = /滴滴|出行/i.test(merchantName || '') || /滴滴|出行/i.test(text || '');
+  const hasTransportItem = /交通运输|客运服务/i.test(itemName || '') || /交通运输|客运服务/i.test(text || '');
+
+  if (hasTransportMerchant || hasTransportItem) {
+    let extractedMerchant = merchantName;
+    if (!extractedMerchant) {
+      const match = fullText.match(/([\u4e00-\u9fa5A-Za-z0-9]{2,25}(?:滴滴|出行)[\u4e00-\u9fa5A-Za-z0-9]*)/);
+      if (match) {
+        extractedMerchant = match[1];
+      } else if (/滴滴/i.test(fullText)) {
+        extractedMerchant = '滴滴出行';
+      } else if (/出行/i.test(fullText)) {
+        extractedMerchant = '出行服务';
+      }
+    }
+
+    let extractedItem = itemName;
+    if (!extractedItem) {
+      if (/交通运输/i.test(fullText)) extractedItem = '*交通运输服务*客运服务费';
+      else if (/客运服务/i.test(fullText)) extractedItem = '*客运服务*客运服务费';
+      else extractedItem = '打车/出行交通费';
+    }
+
+    return {
+      isTransportInvoice: true,
+      merchantName: extractedMerchant,
+      itemName: extractedItem,
+    };
+  }
+
+  return { isTransportInvoice: false };
+}
+
+/**
  * Direct client-side OCR recognition (Pure Frontend Implementation)
  */
 export async function processTicketOcr(
@@ -731,12 +774,27 @@ export async function processTicketOcr(
       if (data.isValidTicket || data.trainNumber || data.origin || data.destination || data.recordType === 'expense' || data.price) {
         const fullPdfText = pdfTextLines.join(' ');
         const hotelCheck = detectAccommodationInvoice(fullPdfText);
-        const isAccommodation = data.recordType === 'expense' || data.expenseCategory === '住宿' || hotelCheck.isAccommodation;
+        const transportCheck = detectTransportInvoice(fullPdfText, data.merchantName, data.itemName);
 
-        const recordType = isAccommodation ? 'expense' : (data.recordType || 'trip');
-        const expenseCategory = isAccommodation ? '住宿' : data.expenseCategory;
-        const merchantName = data.merchantName || hotelCheck.merchantName || '';
-        const itemName = data.itemName || hotelCheck.itemName || '';
+        const isAccommodation = (data.recordType === 'expense' && data.expenseCategory === '住宿') || hotelCheck.isAccommodation;
+        const isTransportInvoice = (data.recordType === 'expense' && data.expenseCategory === '交通') || transportCheck.isTransportInvoice;
+
+        let recordType = data.recordType || 'trip';
+        let expenseCategory = data.expenseCategory;
+        let merchantName = data.merchantName || '';
+        let itemName = data.itemName || '';
+
+        if (isTransportInvoice) {
+          recordType = 'expense';
+          expenseCategory = '交通';
+          if (!merchantName && transportCheck.merchantName) merchantName = transportCheck.merchantName;
+          if (!itemName && transportCheck.itemName) itemName = transportCheck.itemName;
+        } else if (isAccommodation) {
+          recordType = 'expense';
+          expenseCategory = '住宿';
+          if (!merchantName && hotelCheck.merchantName) merchantName = hotelCheck.merchantName;
+          if (!itemName && hotelCheck.itemName) itemName = hotelCheck.itemName;
+        }
 
         const transportType = inferTransportType(data.trainNumber || data.transportType || pdfParsed?.trainNumber);
 
@@ -924,6 +982,62 @@ export async function processTicketOcr(
 
     const parsed = parseTicketInfoFromText(extractedTextList, pdfTextItemsWithPos);
     const transportType = inferTransportType(parsed.trainNumber || pdfParsed?.trainNumber);
+
+    const fullText = extractedTextList.join(' ');
+    const hotelCheck = detectAccommodationInvoice(fullText);
+    const transportCheck = detectTransportInvoice(fullText);
+
+    if (transportCheck.isTransportInvoice) {
+      return {
+        fileId,
+        fileName,
+        fileType: isPdf ? 'pdf' : 'image',
+        previewUrl: imageBase64,
+        isValidTicket: true,
+        recordType: 'expense',
+        expenseCategory: '交通',
+        merchantName: transportCheck.merchantName || '滴滴/出行服务',
+        itemName: transportCheck.itemName || '*交通运输服务*客运服务费',
+        departureDate: parsed.departureDate || pdfParsed?.departureDate || '',
+        price: parsed.price || pdfParsed?.price || 0,
+        confidenceScores: {
+          departureDate: 0.88,
+          price: 0.9,
+        },
+        status: 'success',
+        providerUsed: 'local_paddle',
+        providerName: '本地浏览器 Web-PaddleOCR',
+        pdfTextLines,
+        pdfTextItemsWithPos,
+        convertedImageResolution,
+        processingSteps,
+      };
+    } else if (hotelCheck.isAccommodation) {
+      return {
+        fileId,
+        fileName,
+        fileType: isPdf ? 'pdf' : 'image',
+        previewUrl: imageBase64,
+        isValidTicket: true,
+        recordType: 'expense',
+        expenseCategory: '住宿',
+        merchantName: hotelCheck.merchantName || '酒店住宿',
+        itemName: hotelCheck.itemName || '*住宿服务*住宿费',
+        departureDate: parsed.departureDate || pdfParsed?.departureDate || '',
+        price: parsed.price || pdfParsed?.price || 0,
+        confidenceScores: {
+          departureDate: 0.88,
+          price: 0.9,
+        },
+        status: 'success',
+        providerUsed: 'local_paddle',
+        providerName: '本地浏览器 Web-PaddleOCR',
+        pdfTextLines,
+        pdfTextItemsWithPos,
+        convertedImageResolution,
+        processingSteps,
+      };
+    }
 
     return {
       fileId,

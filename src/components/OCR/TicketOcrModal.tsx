@@ -176,11 +176,11 @@ export const TicketOcrModal: React.FC = () => {
       const expItem = {
         id: `expense-ocr-${Date.now()}`,
         date: draft.editedDate || new Date().toISOString().split('T')[0],
-        category: draft.editedCategory || '住宿',
+        category: draft.editedCategory || '交通',
         amount: Number(draft.editedAmount) || 0,
         description: draft.editedMerchantName
-          ? `【${draft.editedMerchantName}】${draft.editedRemarks || '住宿发票'}`
-          : draft.editedRemarks || '住宿发票',
+          ? `【${draft.editedMerchantName}】${draft.editedRemarks || draft.itemName || '发票识别录入'}`
+          : draft.editedRemarks || '发票识别录入',
         createdAt: Date.now(),
       };
       closeOcrModal();
@@ -236,11 +236,11 @@ export const TicketOcrModal: React.FC = () => {
       const expenseItems = expenseDrafts.map((d, index) => ({
         id: `expense-ocr-${Date.now()}-${index}`,
         date: d.editedDate || new Date().toISOString().split('T')[0],
-        category: d.editedCategory || '住宿',
+        category: d.editedCategory || '交通',
         amount: Number(d.editedAmount) || 0,
         description: d.editedMerchantName
-          ? `【${d.editedMerchantName}】${d.editedRemarks || '住宿发票识别录入'}`
-          : d.editedRemarks || '住宿发票识别录入',
+          ? `【${d.editedMerchantName}】${d.editedRemarks || d.itemName || '发票识别录入'}`
+          : d.editedRemarks || '发票识别录入',
         createdAt: Date.now() + index,
       }));
       await batchAddExpenses(expenseItems);
@@ -560,7 +560,7 @@ export const TicketOcrModal: React.FC = () => {
                                     费用类别
                                   </label>
                                   <select
-                                    value={draft.editedCategory || '住宿'}
+                                    value={draft.editedCategory || '交通'}
                                     onChange={(e) => {
                                       const val = e.target.value as any;
                                       setDrafts((prev) =>
@@ -569,21 +569,26 @@ export const TicketOcrModal: React.FC = () => {
                                     }}
                                     className="w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 focus:outline-none bg-white dark:bg-slate-900"
                                   >
+                                    <option value="交通">交通费 (滴滴/出行/打车发票)</option>
                                     <option value="住宿">住宿费 (酒店/宾馆)</option>
                                     <option value="餐饮">餐饮费</option>
-                                    <option value="市内交通">市内交通</option>
+                                    <option value="物品">物品采购</option>
+                                    <option value="饮品">饮品/茶水</option>
+                                    <option value="水果">水果</option>
+                                    <option value="通讯">通讯/话费</option>
                                     <option value="门票">景区门票</option>
+                                    <option value="娱乐">休闲娱乐</option>
                                     <option value="其他">其他费用</option>
                                   </select>
                                 </div>
 
                                 <div>
                                   <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
-                                    酒店 / 商户名称
+                                    商户 / 出行服务 / 酒店
                                   </label>
                                   <input
                                     type="text"
-                                    placeholder="如: 汉庭酒店 / 亚朵酒店"
+                                    placeholder="如: 滴滴出行 / 亚朵酒店"
                                     value={draft.editedMerchantName || ''}
                                     onChange={(e) => {
                                       const val = e.target.value;

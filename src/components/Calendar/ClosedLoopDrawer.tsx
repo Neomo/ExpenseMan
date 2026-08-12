@@ -6,6 +6,7 @@ import {
   X,
   ChevronRight,
   Info,
+  Zap,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { analyzeTripChains, CHAIN_THEMES } from '../../utils/tripAnalyzer';
@@ -21,7 +22,7 @@ export const ClosedLoopDrawer: React.FC<ClosedLoopDrawerProps> = ({
   onClose,
   onOpen,
 }) => {
-  const { trips, setSelectedDate, showToast } = useAppStore();
+  const { trips, setSelectedDate, showToast, allowanceConfig, generateTripAllowances } = useAppStore();
 
   const tripChains = React.useMemo(() => analyzeTripChains(trips), [trips]);
 
@@ -113,6 +114,29 @@ export const ClosedLoopDrawer: React.FC<ClosedLoopDrawerProps> = ({
                   <p className="text-indigo-800/80 dark:text-indigo-300/80 font-medium text-[11px] leading-relaxed">
                     点击下方任意一条闭环路线，日历将自动切换月份并聚焦至该闭环的<strong className="text-indigo-900 dark:text-indigo-100">出差首日</strong>。
                   </p>
+                </div>
+
+                {/* Subsidy Quick Action Banner */}
+                <div className="p-3.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between text-xs gap-2">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-amber-900 dark:text-amber-200 block text-xs">
+                      出差补贴标准：¥{allowanceConfig?.allowanceRate || 80} / 天
+                    </span>
+                    <span className="text-[11px] text-amber-800/80 dark:text-amber-300/80 block font-medium">
+                      本地城市：{allowanceConfig?.homeCity || '武汉'} (闭环周期全自动算补贴)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      generateTripAllowances(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center gap-1 shadow-xs transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>一键补全</span>
+                  </button>
                 </div>
 
                 {tripChains.length === 0 ? (

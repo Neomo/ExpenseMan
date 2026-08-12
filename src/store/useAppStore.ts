@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { format } from 'date-fns';
-import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip, CalendarDisplayConfig } from '../types';
+import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip, CalendarDisplayConfig, AllowanceConfig } from '../types';
 import { CityStationRecord, RailwayStation, DEFAULT_CITY_STATION_RECORDS } from '../data/defaultCityStations';
 import * as db from '../services/db';
 import { processTicketOcr } from '../utils/ticketOcr';
+import { analyzeTripChains, normalizeCity, getDatesInRange } from '../utils/tripAnalyzer';
 
 export const DEFAULT_CALENDAR_DISPLAY_CONFIG: CalendarDisplayConfig = {
   showExpenses: true,
@@ -12,6 +13,12 @@ export const DEFAULT_CALENDAR_DISPLAY_CONFIG: CalendarDisplayConfig = {
   showDailyTotal: true,
   weekdayFormat: 'zh',
   theme: 'island',
+};
+
+export const DEFAULT_ALLOWANCE_CONFIG: AllowanceConfig = {
+  homeCity: '武汉',
+  allowanceRate: 80,
+  autoAddAllowance: true,
 };
 
 interface AppState {
@@ -24,6 +31,7 @@ interface AppState {
   isLoading: boolean;
   ocrConfig: OcrConfig;
   calendarDisplayConfig: CalendarDisplayConfig;
+  allowanceConfig: AllowanceConfig;
 
   // Background OCR State
   ocrDrafts: DraftTrip[];
@@ -58,6 +66,8 @@ interface AppState {
   setSelectedDate: (dateStr: string) => void;
   setCalendarFocusDate: (date: Date) => void;
   updateCalendarDisplayConfig: (partialConfig: Partial<CalendarDisplayConfig>) => Promise<void>;
+  updateAllowanceConfig: (partialConfig: Partial<AllowanceConfig>) => Promise<void>;
+  generateTripAllowances: (manualTrigger?: boolean) => Promise<number>;
 
   // City Station DB Actions
   addCityStation: (record: Omit<CityStationRecord, 'id'>) => Promise<void>;
@@ -117,6 +127,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: true,
   ocrConfig: { provider: 'local_paddle' },
   calendarDisplayConfig: DEFAULT_CALENDAR_DISPLAY_CONFIG,
+  allowanceConfig: DEFAULT_ALLOWANCE_CONFIG,
 
   ocrDrafts: [],
   isOcrProcessing: false,
@@ -152,6 +163,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         'calendarDisplayConfig',
         DEFAULT_CALENDAR_DISPLAY_CONFIG
       );
+      const storedAllowanceConfig = await db.getSetting<AllowanceConfig>(
+        'allowanceConfig',
+        DEFAULT_ALLOWANCE_CONFIG
+      );
 
       // Apply theme to document element
       if (storedTheme === 'dark') {
@@ -168,8 +183,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         theme: storedTheme,
         ocrConfig: storedOcrConfig,
         calendarDisplayConfig: { ...DEFAULT_CALENDAR_DISPLAY_CONFIG, ...storedCalendarDisplayConfig },
+        allowanceConfig: { ...DEFAULT_ALLOWANCE_CONFIG, ...storedAllowanceConfig },
         isLoading: false,
       });
+
+      // Auto generate missing allowance expenses for closed loop trip chains
+      if (storedAllowanceConfig?.autoAddAllowance !== false) {
+        await get().generateTripAllowances(false);
+      }
     } catch (err) {
       console.error('Failed to initialize IndexedDB:', err);
       set({ isLoading: false });
@@ -297,11 +318,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const existingTrips = get().trips;
       const existingExpenses = get().expenses;
 
-      const isExpenseDraft = result.recordType === 'expense' || result.expenseCategory === '住宿';
+      const isExpenseDraft = result.recordType === 'expense' || result.expenseCategory === '住宿' || result.expenseCategory === '交通';
 
       const isDup = isExpenseDraft
         ? existingExpenses.some((existing) => {
-            const sameCategory = existing.category === (result.expenseCategory || '住宿');
+            const sameCategory = existing.category === (result.expenseCategory || '交通') || existing.category === (result.expenseCategory || '住宿');
             const sameDate = existing.date === result.departureDate;
             const sameAmount = Math.abs(existing.amount - (result.price || 0)) < 0.01;
             return sameCategory && sameDate && sameAmount;
@@ -318,7 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const draft: DraftTrip = {
         ...result,
         editedRecordType: isExpenseDraft ? 'expense' : (result.recordType || 'trip'),
-        editedCategory: (result.expenseCategory as any) || '住宿',
+        editedCategory: (result.expenseCategory as any) || (isExpenseDraft ? '交通' : '住宿'),
         editedMerchantName: result.merchantName || '',
         editedTrainNumber: result.trainNumber || '',
         editedTransport: result.transportType || '火车',
@@ -328,7 +349,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         editedStartTime: result.departureTime || '',
         editedAmount: result.price || 0,
         editedRemarks: result.merchantName
-          ? `商户/酒店: ${result.merchantName}${result.itemName ? ` (${result.itemName})` : ''}`
+          ? `【${result.merchantName}】${result.itemName ? `(${result.itemName})` : ''}`
           : result.seatInfo
           ? `席别: ${result.seatInfo}`
           : '',
@@ -395,6 +416,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       const trips = await db.getAllTrips();
       set({ trips, ocrModalOpen: false, ocrDrafts: [] });
+      await get().generateTripAllowances(false);
 
       if (skippedDuplicates > 0) {
         get().showToast(
@@ -500,6 +522,82 @@ export const useAppStore = create<AppState>((set, get) => ({
     await db.saveSetting('calendarDisplayConfig', updated);
   },
 
+  updateAllowanceConfig: async (partialConfig) => {
+    const current = get().allowanceConfig;
+    const updated = { ...current, ...partialConfig };
+    set({ allowanceConfig: updated });
+    await db.saveSetting('allowanceConfig', updated);
+    get().showToast('出差补贴与本地城市配置已更新', 'success');
+    if (updated.autoAddAllowance) {
+      await get().generateTripAllowances(false);
+    }
+  },
+
+  generateTripAllowances: async (manualTrigger = false) => {
+    const { trips, expenses, allowanceConfig, showToast } = get();
+    if (!allowanceConfig.autoAddAllowance && !manualTrigger) return 0;
+
+    const rate = Number(allowanceConfig.allowanceRate) || 80;
+    const homeCity = allowanceConfig.homeCity || '武汉';
+    const normHome = normalizeCity(homeCity);
+
+    // Get all closed-loop chains
+    const chains = analyzeTripChains(trips);
+
+    // Filter chains that involve travel outside home city
+    const outOfTownChains = chains.filter((c) => {
+      if (!normHome) return true;
+      return (
+        c.cities.some((cityName) => normalizeCity(cityName) !== normHome) ||
+        normalizeCity(c.startCity) !== normHome
+      );
+    });
+
+    const newExpenses: ExpenseItem[] = [];
+    const existingExpensesMap = new Set(
+      expenses
+        .filter((e) => e.category === '补贴')
+        .map((e) => e.date)
+    );
+
+    for (const chain of outOfTownChains) {
+      const chainDates = getDatesInRange(chain.startDate, chain.endDate);
+      for (const dateStr of chainDates) {
+        if (!existingExpensesMap.has(dateStr)) {
+          const item: ExpenseItem = {
+            id: `expense-allowance-${dateStr}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            date: dateStr,
+            category: '补贴',
+            amount: rate,
+            description: `【出差补贴】${chain.startCity} 闭环差旅补贴 (${dateStr === chain.startDate ? '去程' : dateStr === chain.endDate ? '返程' : '出差中'})`,
+            createdAt: Date.now(),
+          };
+          newExpenses.push(item);
+          existingExpensesMap.add(dateStr);
+        }
+      }
+    }
+
+    if (newExpenses.length > 0) {
+      for (const exp of newExpenses) {
+        await db.saveExpense(exp);
+      }
+      const updatedExpenses = [...expenses, ...newExpenses];
+      set({ expenses: updatedExpenses });
+      if (manualTrigger) {
+        const totalSum = newExpenses.reduce((s, e) => s + e.amount, 0);
+        showToast(
+          `已根据闭环差旅行程，自动补全 ${newExpenses.length} 天出差补贴（合计 ¥${totalSum}）`,
+          'success'
+        );
+      }
+    } else if (manualTrigger) {
+      showToast('当前所有闭环差旅行程的出差补贴均已补齐，无需重复生成', 'info');
+    }
+
+    return newExpenses.length;
+  },
+
   openDateDetail: (dateStr) => set({ selectedDate: dateStr, dateDetailOpen: true }),
   closeDateDetail: () => set({ dateDetailOpen: false }),
 
@@ -517,6 +615,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const trips = await db.getAllTrips();
     set({ trips, tripModalOpen: false, editingTrip: null });
     get().showToast(trip.id ? '行程记录已更新' : '已成功添加行程', 'success');
+    await get().generateTripAllowances(false);
   },
 
   deleteTrip: async (id) => {
@@ -595,6 +694,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         theme: storedTheme,
         isLoading: false,
       });
+      await get().generateTripAllowances(false);
       get().showToast(`数据导入成功！导入 ${res.tripsImported} 条行程和 ${res.expensesImported} 条费用`, 'success');
     } catch (err) {
       console.error('Import failed:', err);
