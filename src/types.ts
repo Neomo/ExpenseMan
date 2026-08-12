@@ -134,10 +134,22 @@ export interface TripChain {
   themeIndex: number;
 }
 
+export type CalendarThemeKey = 'island' | 'sakura' | 'ocean' | 'maple' | 'winter' | 'slate';
+
+export interface CalendarDisplayConfig {
+  showExpenses: boolean;          // 是否显示非行程费用项
+  showTripTicketCost: boolean;    // 是否显示行程车票金额
+  showTripStartTime: boolean;     // 是否显示行程出发时间
+  showDailyTotal: boolean;        // 是否显示每日合计费用
+  weekdayFormat: 'zh' | 'en';     // 星期格式: 'zh'(周一...) 或 'en'(MON...)
+  theme: CalendarThemeKey;        // 日历主题
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   currencySymbol: string;
   ocrConfig?: OcrConfig;
+  calendarDisplayConfig?: CalendarDisplayConfig;
 }
 
 export type ViewMode = 'month' | 'week' | 'day';

@@ -1,9 +1,8 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { getWeekDaysGrid, formatChineseDate, sortTripsByStartTime } from '../../utils/dateUtils';
-import { Plane, Receipt, Plus, MapPin, Clock } from 'lucide-react';
-
-const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+import { getWeekDaysGrid, sortTripsByStartTime } from '../../utils/dateUtils';
+import { CALENDAR_THEMES } from '../../utils/calendarThemes';
+import { Plane, Receipt, Plus } from 'lucide-react';
 
 export const WeekView: React.FC = () => {
   const {
@@ -15,15 +14,21 @@ export const WeekView: React.FC = () => {
     selectedDate,
     openTripModal,
     openExpenseModal,
+    calendarDisplayConfig,
   } = useAppStore();
 
   const weekGrid = getWeekDaysGrid(calendarFocusDate);
+  const themeObj = CALENDAR_THEMES[calendarDisplayConfig.theme] || CALENDAR_THEMES.island;
+
+  const WEEKDAYS = calendarDisplayConfig.weekdayFormat === 'zh'
+    ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
       {weekGrid.map((cell, idx) => {
         const dayTrips = sortTripsByStartTime(trips.filter((t) => t.date === cell.dateStr));
-        const dayExpenses = expenses.filter((e) => e.date === cell.dateStr);
+        const dayExpenses = calendarDisplayConfig.showExpenses ? expenses.filter((e) => e.date === cell.dateStr) : [];
 
         const tripSum = dayTrips.reduce((sum, t) => sum + t.amount, 0);
         const expSum = dayExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -37,36 +42,36 @@ export const WeekView: React.FC = () => {
             id={`week-col-${cell.dateStr}`}
             onClick={() => setSelectedDate(cell.dateStr)}
             onDoubleClick={() => openDateDetail(cell.dateStr)}
-            className={`p-3 rounded-2xl border bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between cursor-pointer transition-all hover:border-[#52c488] dark:hover:border-[#52c488] ${
+            className={`p-3 rounded-2xl border bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between cursor-pointer transition-all hover:border-emerald-500 ${
               isSelected
-                ? 'border-[#52c488] ring-3 ring-[#52c488]/30 bg-[#e8f7ee]/30 dark:bg-emerald-950/20'
-                : 'border-[#e0f0e6] dark:border-slate-800'
+                ? `ring-3 ${themeObj.selectedRing} ${themeObj.selectedBg}`
+                : 'border-slate-200 dark:border-slate-800'
             }`}
           >
             {/* Column Header */}
             <div className="pb-2 mb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{WEEKDAYS[idx]}</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{WEEKDAYS[idx]}</span>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span
-                    className={`text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                    className={`text-sm font-black w-6 h-6 rounded-lg flex items-center justify-center ${
                       cell.isToday
-                        ? 'bg-blue-600 text-white'
+                        ? `${themeObj.todayBadgeBg} ${themeObj.todayBadgeText}`
                         : 'text-slate-900 dark:text-slate-100'
                     }`}
                   >
                     {cell.dayNumber}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-400 font-bold">
                     {cell.date.getMonth() + 1}月
                   </span>
                 </div>
               </div>
 
-              {total > 0 && (
+              {calendarDisplayConfig.showDailyTotal && total > 0 && (
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block">小计</span>
-                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[10px] text-slate-400 block font-bold">小计</span>
+                  <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
                     ¥{total.toFixed(0)}
                   </span>
                 </div>
@@ -78,58 +83,69 @@ export const WeekView: React.FC = () => {
               {dayTrips.map((t, tIdx) => (
                 <div
                   key={`wtrip-${t.id}-${tIdx}`}
-                  className="p-2 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-xs space-y-1"
+                  className={`p-2 rounded-xl ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} text-xs space-y-1`}
                 >
-                  <div className="flex items-center justify-between font-medium text-blue-900 dark:text-blue-200">
+                  <div className="flex items-center justify-between font-bold">
                     <span className="flex items-center gap-1">
-                      <Plane className="w-3 h-3 text-blue-500 shrink-0" />
+                      <Plane className="w-3 h-3 shrink-0" />
                       {t.transport}
                     </span>
-                    <span className="font-bold">¥{t.amount}</span>
+                    {calendarDisplayConfig.showTripTicketCost && (
+                      <span className="font-mono font-black">¥{t.amount}</span>
+                    )}
                   </div>
-                  {t.destination && (
-                    <div className="text-[10px] text-blue-700 dark:text-blue-300 truncate">
+                  {t.origin && t.destination ? (
+                    <div className="text-[10px] opacity-90 truncate">
+                      {t.origin} → {t.destination}
+                    </div>
+                  ) : t.destination ? (
+                    <div className="text-[10px] opacity-90 truncate">
                       到: {t.destination}
+                    </div>
+                  ) : null}
+                  {calendarDisplayConfig.showTripStartTime && t.startTime && (
+                    <div className="text-[9px] opacity-75 font-mono">
+                      🕒 {t.startTime}
                     </div>
                   )}
                 </div>
               ))}
 
-              {dayExpenses.map((e, eIdx) => (
+              {calendarDisplayConfig.showExpenses && dayExpenses.map((e, eIdx) => (
                 <div
                   key={`wexp-${e.id}-${eIdx}`}
-                  className="p-2 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 text-xs space-y-1"
+                  className="p-2 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-xs space-y-1 text-amber-950 dark:text-amber-200"
                 >
-                  <div className="flex items-center justify-between font-medium text-emerald-900 dark:text-emerald-200">
+                  <div className="flex items-center justify-between font-bold">
                     <span className="flex items-center gap-1">
-                      <Receipt className="w-3 h-3 text-emerald-500 shrink-0" />
+                      <Receipt className="w-3 h-3 text-amber-600 shrink-0" />
                       {e.category}
                     </span>
-                    <span className="font-bold">¥{e.amount}</span>
+                    <span className="font-mono font-black">¥{e.amount}</span>
                   </div>
                   {e.description && (
-                    <div className="text-[10px] text-emerald-700 dark:text-emerald-300 truncate">
+                    <div className="text-[10px] opacity-80 truncate">
                       {e.description}
                     </div>
                   )}
                 </div>
               ))}
 
-              {dayTrips.length === 0 && dayExpenses.length === 0 && (
+              {dayTrips.length === 0 && (!calendarDisplayConfig.showExpenses || dayExpenses.length === 0) && (
                 <div className="text-center py-8 text-slate-300 dark:text-slate-700 text-xs">
                   无记录
                 </div>
               )}
             </div>
 
-            {/* Quick Action Button */}
+            {/* Quick Action Buttons */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   openTripModal(undefined, cell.dateStr);
                 }}
-                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-bold"
               >
                 <Plus className="w-3 h-3" /> 行程
               </button>
@@ -138,7 +154,7 @@ export const WeekView: React.FC = () => {
                   e.stopPropagation();
                   openExpenseModal(undefined, cell.dateStr);
                 }}
-                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-bold"
               >
                 <Plus className="w-3 h-3" /> 费用
               </button>

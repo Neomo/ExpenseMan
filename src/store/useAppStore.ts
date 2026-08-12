@@ -1,9 +1,18 @@
 import { create } from 'zustand';
 import { format } from 'date-fns';
-import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip } from '../types';
+import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip, CalendarDisplayConfig } from '../types';
 import { CityStationRecord, RailwayStation, DEFAULT_CITY_STATION_RECORDS } from '../data/defaultCityStations';
 import * as db from '../services/db';
 import { processTicketOcr } from '../utils/ticketOcr';
+
+export const DEFAULT_CALENDAR_DISPLAY_CONFIG: CalendarDisplayConfig = {
+  showExpenses: true,
+  showTripTicketCost: true,
+  showTripStartTime: true,
+  showDailyTotal: true,
+  weekdayFormat: 'zh',
+  theme: 'island',
+};
 
 interface AppState {
   // Data State
@@ -14,6 +23,7 @@ interface AppState {
   theme: 'light' | 'dark';
   isLoading: boolean;
   ocrConfig: OcrConfig;
+  calendarDisplayConfig: CalendarDisplayConfig;
 
   // Background OCR State
   ocrDrafts: DraftTrip[];
@@ -47,6 +57,7 @@ interface AppState {
   setCurrentViewMode: (mode: ViewMode) => void;
   setSelectedDate: (dateStr: string) => void;
   setCalendarFocusDate: (date: Date) => void;
+  updateCalendarDisplayConfig: (partialConfig: Partial<CalendarDisplayConfig>) => Promise<void>;
 
   // City Station DB Actions
   addCityStation: (record: Omit<CityStationRecord, 'id'>) => Promise<void>;
@@ -105,6 +116,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: 'light',
   isLoading: true,
   ocrConfig: { provider: 'local_paddle' },
+  calendarDisplayConfig: DEFAULT_CALENDAR_DISPLAY_CONFIG,
 
   ocrDrafts: [],
   isOcrProcessing: false,
@@ -136,6 +148,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const storedCityStations = await db.getCityStations();
       const storedTheme = await db.getSetting<'light' | 'dark'>('theme', 'light');
       const storedOcrConfig = await db.getSetting<OcrConfig>('ocrConfig', { provider: 'local_paddle' });
+      const storedCalendarDisplayConfig = await db.getSetting<CalendarDisplayConfig>(
+        'calendarDisplayConfig',
+        DEFAULT_CALENDAR_DISPLAY_CONFIG
+      );
 
       // Apply theme to document element
       if (storedTheme === 'dark') {
@@ -151,6 +167,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         cityStations: storedCityStations,
         theme: storedTheme,
         ocrConfig: storedOcrConfig,
+        calendarDisplayConfig: { ...DEFAULT_CALENDAR_DISPLAY_CONFIG, ...storedCalendarDisplayConfig },
         isLoading: false,
       });
     } catch (err) {
@@ -475,6 +492,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ selectedDate: dateStr });
   },
   setCalendarFocusDate: (date) => set({ calendarFocusDate: date }),
+
+  updateCalendarDisplayConfig: async (partialConfig) => {
+    const current = get().calendarDisplayConfig;
+    const updated = { ...current, ...partialConfig };
+    set({ calendarDisplayConfig: updated });
+    await db.saveSetting('calendarDisplayConfig', updated);
+  },
 
   openDateDetail: (dateStr) => set({ selectedDate: dateStr, dateDetailOpen: true }),
   closeDateDetail: () => set({ dateDetailOpen: false }),
