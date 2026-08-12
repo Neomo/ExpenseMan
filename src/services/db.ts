@@ -1,5 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { TripItem, ExpenseItem, CustomCategory, AppSettings, BackupData } from '../types';
+import { CityStationRecord, DEFAULT_CITY_STATION_RECORDS } from '../data/defaultCityStations';
 
 interface TravelExpenseDBSchema extends DBSchema {
   trips: {
@@ -151,6 +152,15 @@ export async function getSetting<T>(key: string, defaultValue: T): Promise<T> {
 export async function saveSetting<T>(key: string, value: T): Promise<void> {
   const db = await getDB();
   await db.put('settings', { key, value });
+}
+
+// City Stations DB Operations
+export async function getCityStations(): Promise<CityStationRecord[]> {
+  return getSetting<CityStationRecord[]>('cityStations', DEFAULT_CITY_STATION_RECORDS);
+}
+
+export async function saveCityStations(records: CityStationRecord[]): Promise<void> {
+  return saveSetting<CityStationRecord[]>('cityStations', records);
 }
 
 // Import / Export Operations

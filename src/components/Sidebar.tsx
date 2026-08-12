@@ -3,6 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import {
   Calendar,
   ListOrdered,
+  MapPin,
   BarChart3,
   Settings,
   Sparkles,
@@ -34,6 +35,7 @@ export const Sidebar: React.FC = () => {
   const navItems = [
     { id: 'calendar', label: '日历视图', icon: Calendar },
     { id: 'list', label: '明细清单', icon: ListOrdered },
+    { id: 'map', label: '地图视图', icon: MapPin },
     { id: 'report', label: '费用报告', icon: BarChart3 },
     { id: 'settings', label: '数据与分类', icon: Settings },
   ] as const;

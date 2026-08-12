@@ -61,6 +61,25 @@ export function sortTripsByStartTime<T extends { startTime?: string; createdAt?:
   });
 }
 
+export function getTodayRange(): { startDate: string; endDate: string } {
+  const today = formatDateStr(new Date());
+  return { startDate: today, endDate: today };
+}
+
+export function getThisWeekRange(): { startDate: string; endDate: string } {
+  const now = new Date();
+  const start = startOfWeek(now, { weekStartsOn: 1 });
+  const end = endOfWeek(now, { weekStartsOn: 1 });
+  return { startDate: formatDateStr(start), endDate: formatDateStr(end) };
+}
+
+export function getThisMonthRange(): { startDate: string; endDate: string } {
+  const now = new Date();
+  const start = startOfMonth(now);
+  const end = endOfMonth(now);
+  return { startDate: formatDateStr(start), endDate: formatDateStr(end) };
+}
+
 export interface CalendarDayCell {
   date: Date;
   dateStr: string;

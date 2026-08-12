@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { format } from 'date-fns';
 import { TripItem, ExpenseItem, CustomCategory, ViewMode, BackupData, OcrConfig, DraftTrip } from '../types';
+import { CityStationRecord, RailwayStation, DEFAULT_CITY_STATION_RECORDS } from '../data/defaultCityStations';
 import * as db from '../services/db';
 import { processTicketOcr } from '../utils/ticketOcr';
 
@@ -9,6 +10,7 @@ interface AppState {
   trips: TripItem[];
   expenses: ExpenseItem[];
   customCategories: CustomCategory[];
+  cityStations: CityStationRecord[];
   theme: 'light' | 'dark';
   isLoading: boolean;
   ocrConfig: OcrConfig;
@@ -21,7 +23,7 @@ interface AppState {
   ocrCompletedFiles: number;
 
   // View Controls
-  activeTab: 'calendar' | 'list' | 'report' | 'settings';
+  activeTab: 'calendar' | 'list' | 'map' | 'report' | 'settings';
   currentViewMode: ViewMode;
   selectedDate: string; // YYYY-MM-DD
   calendarFocusDate: Date; // date object driving month/week/day view
@@ -41,10 +43,18 @@ interface AppState {
   init: () => Promise<void>;
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
-  setActiveTab: (tab: 'calendar' | 'list' | 'report' | 'settings') => void;
+  setActiveTab: (tab: 'calendar' | 'list' | 'map' | 'report' | 'settings') => void;
   setCurrentViewMode: (mode: ViewMode) => void;
   setSelectedDate: (dateStr: string) => void;
   setCalendarFocusDate: (date: Date) => void;
+
+  // City Station DB Actions
+  addCityStation: (record: Omit<CityStationRecord, 'id'>) => Promise<void>;
+  updateCityStation: (id: string, record: Partial<CityStationRecord>) => Promise<void>;
+  deleteCityStation: (id: string) => Promise<void>;
+  addStationToCity: (cityId: string, station: Omit<RailwayStation, 'id'>) => Promise<void>;
+  deleteStationFromCity: (cityId: string, stationId: string) => Promise<void>;
+  resetCityStationsToDefault: () => Promise<void>;
   
   // Date Detail Panel
   openDateDetail: (dateStr: string) => void;
@@ -91,6 +101,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   trips: [],
   expenses: [],
   customCategories: [],
+  cityStations: DEFAULT_CITY_STATION_RECORDS,
   theme: 'light',
   isLoading: true,
   ocrConfig: { provider: 'local_paddle' },
@@ -122,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const trips = await db.getAllTrips();
       const expenses = await db.getAllExpenses();
       const customCategories = await db.getAllCustomCategories();
+      const storedCityStations = await db.getCityStations();
       const storedTheme = await db.getSetting<'light' | 'dark'>('theme', 'light');
       const storedOcrConfig = await db.getSetting<OcrConfig>('ocrConfig', { provider: 'local_paddle' });
 
@@ -136,6 +148,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         trips,
         expenses,
         customCategories,
+        cityStations: storedCityStations,
         theme: storedTheme,
         ocrConfig: storedOcrConfig,
         isLoading: false,
@@ -145,6 +158,75 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isLoading: false });
       get().showToast('数据库初始化失败，请检查浏览器设置', 'error');
     }
+  },
+
+  // City Station DB Actions
+  addCityStation: async (recordData) => {
+    const newRecord: CityStationRecord = {
+      ...recordData,
+      id: `city-${Date.now()}`,
+    };
+    const updated = [newRecord, ...get().cityStations];
+    set({ cityStations: updated });
+    await db.saveCityStations(updated);
+    get().showToast(`已新增城市「${newRecord.cityName}」映射记录`, 'success');
+  },
+
+  updateCityStation: async (id, partialRecord) => {
+    const updated = get().cityStations.map((item) =>
+      item.id === id ? { ...item, ...partialRecord } : item
+    );
+    set({ cityStations: updated });
+    await db.saveCityStations(updated);
+    get().showToast('已更新城市与火车站数据', 'success');
+  },
+
+  deleteCityStation: async (id) => {
+    const target = get().cityStations.find((item) => item.id === id);
+    const updated = get().cityStations.filter((item) => item.id !== id);
+    set({ cityStations: updated });
+    await db.saveCityStations(updated);
+    get().showToast(`已删除城市「${target?.cityName || ''}」及其火车站数据`, 'info');
+  },
+
+  addStationToCity: async (cityId, stationData) => {
+    const newStation: RailwayStation = {
+      ...stationData,
+      id: `st-${Date.now()}`,
+    };
+    const updated = get().cityStations.map((city) => {
+      if (city.id === cityId) {
+        return {
+          ...city,
+          stations: [...city.stations, newStation],
+        };
+      }
+      return city;
+    });
+    set({ cityStations: updated });
+    await db.saveCityStations(updated);
+    get().showToast(`已添加火车站「${newStation.name}」`, 'success');
+  },
+
+  deleteStationFromCity: async (cityId, stationId) => {
+    const updated = get().cityStations.map((city) => {
+      if (city.id === cityId) {
+        return {
+          ...city,
+          stations: city.stations.filter((st) => st.id !== stationId),
+        };
+      }
+      return city;
+    });
+    set({ cityStations: updated });
+    await db.saveCityStations(updated);
+    get().showToast('已移除该火车站', 'info');
+  },
+
+  resetCityStationsToDefault: async () => {
+    set({ cityStations: DEFAULT_CITY_STATION_RECORDS });
+    await db.saveCityStations(DEFAULT_CITY_STATION_RECORDS);
+    get().showToast('已恢复预设城市火车站数据库', 'success');
   },
 
   openOcrModal: () => set({ ocrModalOpen: true }),

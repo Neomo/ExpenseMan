@@ -1,8 +1,30 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { Plane, Receipt, Search, Filter, Trash2, Edit2, Plus, Calendar, ArrowUpDown, Tag } from 'lucide-react';
+import {
+  Plane,
+  Receipt,
+  Search,
+  Filter,
+  Trash2,
+  Edit2,
+  Plus,
+  Calendar,
+  ArrowUpDown,
+  Tag,
+  LayoutGrid,
+  List,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Sparkles,
+} from 'lucide-react';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
-import { formatChineseDate } from '../../utils/dateUtils';
+import {
+  formatChineseDate,
+  getTodayRange,
+  getThisWeekRange,
+  getThisMonthRange,
+} from '../../utils/dateUtils';
 import { TripItem, ExpenseItem } from '../../types';
 
 export const ItemListView: React.FC = () => {
@@ -15,15 +37,23 @@ export const ItemListView: React.FC = () => {
     deleteExpense,
   } = useAppStore();
 
+  const [displayMode, setDisplayMode] = useState<'card' | 'list'>('card');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'trip' | 'expense'>('all');
   const [dateSortOrder, setDateSortOrder] = useState<'desc' | 'asc'>('desc'); // 'desc': 最近到最远, 'asc': 由远到近
+
+  // Date Range Filters & Presets
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [activeQuickPreset, setActiveQuickPreset] = useState<'today' | 'week' | 'month' | 'custom' | 'none'>('none');
+
+  // Expanded Cards Map for Card View overflow toggle
+  const [expandedCardDates, setExpandedCardDates] = useState<Record<string, boolean>>({});
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'trip' | 'expense'; name: string } | null>(null);
 
   // Group items by date and then split into trips and expenses
   const groupedData = useMemo(() => {
-    // 1. Filter trips
     let filteredTrips = trips;
     let filteredExpenses = expenses;
 
@@ -33,6 +63,17 @@ export const ItemListView: React.FC = () => {
       filteredTrips = [];
     }
 
+    // Filter by Date Range
+    if (startDate) {
+      filteredTrips = filteredTrips.filter((t) => t.date >= startDate);
+      filteredExpenses = filteredExpenses.filter((e) => e.date >= startDate);
+    }
+    if (endDate) {
+      filteredTrips = filteredTrips.filter((t) => t.date <= endDate);
+      filteredExpenses = filteredExpenses.filter((e) => e.date <= endDate);
+    }
+
+    // Filter by Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       filteredTrips = filteredTrips.filter(
@@ -83,7 +124,7 @@ export const ItemListView: React.FC = () => {
       expenses: dateMap[dateStr].expenses,
       dayTotal: dateMap[dateStr].dayTotal,
     }));
-  }, [trips, expenses, filterType, searchQuery, dateSortOrder]);
+  }, [trips, expenses, filterType, searchQuery, dateSortOrder, startDate, endDate]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -101,40 +142,70 @@ export const ItemListView: React.FC = () => {
     <div className="space-y-6">
       {/* Control Header */}
       <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
               <span>差旅账单明细清单</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#e3f6ec] text-[#2f8859] dark:bg-emerald-950 dark:text-emerald-300 font-extrabold border border-[#a2e0bd]">
                 共 {totalCount} 笔记录
               </span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              按日期及账单类型（行程/费用）分组呈现，支持车次航班信息即时检索与编辑
+              按日期分组呈现，支持卡片与列表双重视角，并配有当日合计费用统计与精准时间段筛选
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              id="list-add-trip-btn"
-              onClick={() => openTripModal()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-sm transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>加行程</span>
-            </button>
-            <button
-              id="list-add-expense-btn"
-              onClick={() => openExpenseModal()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-sm transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>加费用</span>
-            </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Requirement 1: View Mode Switcher (Card vs List) */}
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setDisplayMode('card')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all ${
+                  displayMode === 'card'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>卡片视图</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayMode('list')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all ${
+                  displayMode === 'list'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>列表视图</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                id="list-add-trip-btn"
+                onClick={() => openTripModal()}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-sm transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>加行程</span>
+              </button>
+              <button
+                id="list-add-expense-btn"
+                onClick={() => openExpenseModal()}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-sm transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>加费用</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Search Bar & Filters */}
+        {/* Row 1: Search Bar & Type Filter & Sort Toggle */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
           {/* Search Box */}
           <div className="sm:col-span-6 relative">
@@ -178,14 +249,325 @@ export const ItemListView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Requirement 4: Time Range Filter & Preset Buttons */}
+        <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800/80 space-y-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Date Range Inputs */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                <span>时间段筛选：</span>
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setActiveQuickPreset('custom');
+                }}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <span className="text-slate-400 text-xs font-bold">至</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setActiveQuickPreset('custom');
+                }}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Quick Preset Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">快捷筛选：</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const range = getTodayRange();
+                  setStartDate(range.startDate);
+                  setEndDate(range.endDate);
+                  setActiveQuickPreset('today');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all ${
+                  activeQuickPreset === 'today'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                ⚡ 当天
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const range = getThisWeekRange();
+                  setStartDate(range.startDate);
+                  setEndDate(range.endDate);
+                  setActiveQuickPreset('week');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all ${
+                  activeQuickPreset === 'week'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                ⚡ 当周
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const range = getThisMonthRange();
+                  setStartDate(range.startDate);
+                  setEndDate(range.endDate);
+                  setActiveQuickPreset('month');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all ${
+                  activeQuickPreset === 'month'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                ⚡ 当月
+              </button>
+
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setActiveQuickPreset('none');
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 transition-colors flex items-center gap-1"
+                  title="重置时间筛选"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>重置</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Grouped List Content */}
+      {/* Grouped Content Container */}
       {groupedData.length === 0 ? (
         <div className="p-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center text-slate-400 text-sm">
           没有找到匹配的差旅明细记录
         </div>
+      ) : displayMode === 'card' ? (
+        /* Requirement 1 & 2 & 3: Card View Mode */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+          {groupedData.map((group) => {
+            const isExpanded = !!expandedCardDates[group.dateStr];
+            const totalItemCount = group.trips.length + group.expenses.length;
+            const isOverflowing = totalItemCount > 2;
+
+            return (
+              <div
+                key={`card-group-${group.dateStr}`}
+                className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden transition-all duration-200 flex flex-col ${
+                  isExpanded ? 'h-auto min-h-[380px] ring-2 ring-blue-500/30' : 'h-[380px]'
+                }`}
+              >
+                {/* Card Header */}
+                <div className="p-4 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 space-y-2.5 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-600 text-white shrink-0">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm block">
+                          {formatChineseDate(group.dateStr)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">({group.dateStr})</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {group.trips.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold">
+                          行程 {group.trips.length}
+                        </span>
+                      )}
+                      {group.expenses.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold">
+                          费用 {group.expenses.length}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Requirement 2: 优先突出显示当天的合计费用 */}
+                  <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-emerald-500/10 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between shadow-2xs">
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>当日合计费用</span>
+                    </span>
+                    <span className="text-lg font-black text-[#d65129] dark:text-amber-400 font-mono">
+                      ¥ {group.dayTotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Items Content Area */}
+                <div
+                  className={`p-3.5 space-y-2 flex-1 ${
+                    isExpanded ? 'overflow-visible' : 'overflow-hidden relative'
+                  }`}
+                >
+                  {/* Display Trips */}
+                  {group.trips.map((t) => (
+                    <div
+                      key={`card-trip-${t.id}`}
+                      className="p-2.5 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-700 transition-all flex items-center justify-between gap-2"
+                    >
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {t.transport}
+                          </span>
+                          {t.trainNumber && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-mono">
+                              {t.trainNumber}
+                            </span>
+                          )}
+                          {(t.origin || t.destination) && (
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                              {t.origin || '始'} → {t.destination || '终'}
+                            </span>
+                          )}
+                        </div>
+                        {t.remarks && (
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {t.remarks}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-[#d65129] dark:text-amber-400 font-mono">
+                          ¥{t.amount.toFixed(2)}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => openTripModal(t, t.date)}
+                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            title="编辑行程"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setDeleteTarget({
+                                id: t.id,
+                                type: 'trip',
+                                name: `${t.transport} ${t.trainNumber || ''} (¥${t.amount})`,
+                              })
+                            }
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            title="删除行程"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Display Expenses */}
+                  {group.expenses.map((e) => (
+                    <div
+                      key={`card-exp-${e.id}`}
+                      className="p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all flex items-center justify-between gap-2"
+                    >
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                            {e.category}
+                          </span>
+                          {e.description && (
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                              {e.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-[#d65129] dark:text-amber-400 font-mono">
+                          ¥{e.amount.toFixed(2)}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => openExpenseModal(e, e.date)}
+                            className="p-1 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            title="编辑费用"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setDeleteTarget({
+                                id: e.id,
+                                type: 'expense',
+                                name: `${e.category} 费用 (¥${e.amount})`,
+                              })
+                            }
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            title="删除费用"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Gradient Fade Mask when collapsed & items overflow */}
+                  {!isExpanded && isOverflowing && (
+                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white dark:from-slate-900 via-white/80 dark:via-slate-900/80 to-transparent pointer-events-none" />
+                  )}
+                </div>
+
+                {/* Requirement 3: 展开/收起按钮 Footer */}
+                {(isOverflowing || isExpanded) && (
+                  <div className="p-2.5 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200/80 dark:border-slate-800 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedCardDates((prev) => ({
+                          ...prev,
+                          [group.dateStr]: !prev[group.dateStr],
+                        }))
+                      }
+                      className="w-full py-1.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold text-xs flex items-center justify-center gap-1 transition-colors"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <span>收起明细</span>
+                          <ChevronUp className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          <span>展开显示全部 (共 {totalItemCount} 笔)</span>
+                          <ChevronDown className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* List View Layout */
         <div className="space-y-6">
           {groupedData.map((group) => (
             <div

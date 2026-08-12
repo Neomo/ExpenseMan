@@ -10,6 +10,7 @@ import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { CalendarView } from './components/Calendar/CalendarView';
 import { ItemListView } from './components/ListView/ItemListView';
+import { MapView } from './components/Map/MapView';
 import { ReportView } from './components/Reports/ReportView';
 import { DataSettingsView } from './components/DataManagement/DataSettingsView';
 import { TripFormModal } from './components/Forms/TripFormModal';
@@ -62,6 +63,7 @@ export default function App() {
         <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0">
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'list' && <ItemListView />}
+          {activeTab === 'map' && <MapView />}
           {activeTab === 'report' && <ReportView />}
           {activeTab === 'settings' && <DataSettingsView />}
         </main>

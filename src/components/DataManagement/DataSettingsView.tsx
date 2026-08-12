@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { TicketRegionEditorModal } from '../OCR/TicketRegionEditorModal';
 import { DEFAULT_RAILWAY_TEMPLATE } from '../../utils/ticketOcr';
+import { CityStationManager } from './CityStationManager';
 
 // Zod Schema for JSON Backup Validation
 const backupDataSchema = z.object({
@@ -324,6 +325,9 @@ export const DataSettingsView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* City & Railway Station Database Manager Section */}
+      <CityStationManager />
 
       {/* Section 3: OCR Service & Security Configuration */}
       <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-5">

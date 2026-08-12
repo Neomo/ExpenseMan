@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Calendar, ListOrdered, BarChart3, Settings } from 'lucide-react';
+import { Calendar, ListOrdered, MapPin, BarChart3, Settings } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab } = useAppStore();
@@ -8,6 +8,7 @@ export const BottomNav: React.FC = () => {
   const navItems = [
     { id: 'calendar', label: '日历', icon: Calendar },
     { id: 'list', label: '清单', icon: ListOrdered },
+    { id: 'map', label: '地图', icon: MapPin },
     { id: 'report', label: '报告', icon: BarChart3 },
     { id: 'settings', label: '设置', icon: Settings },
   ] as const;
