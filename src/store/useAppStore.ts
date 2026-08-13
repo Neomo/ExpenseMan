@@ -175,11 +175,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         document.documentElement.classList.remove('dark');
       }
 
+      // Merge missing default cities into storedCityStations to ensure updated database records
+      const existingCityNames = new Set((storedCityStations || []).map((c) => c.cityName));
+      const mergedCityStations = [...(storedCityStations || [])];
+      DEFAULT_CITY_STATION_RECORDS.forEach((defRecord) => {
+        if (!existingCityNames.has(defRecord.cityName)) {
+          mergedCityStations.push(defRecord);
+        }
+      });
+
       set({
         trips,
         expenses,
         customCategories,
-        cityStations: storedCityStations,
+        cityStations: mergedCityStations,
         theme: storedTheme,
         ocrConfig: storedOcrConfig,
         calendarDisplayConfig: { ...DEFAULT_CALENDAR_DISPLAY_CONFIG, ...storedCalendarDisplayConfig },

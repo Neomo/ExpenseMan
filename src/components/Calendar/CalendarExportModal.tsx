@@ -215,7 +215,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {/* The exported canvas node container */}
             <div
               ref={exportRef}
-              className={`w-full min-w-[700px] p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 ${themeObj.containerBorder} space-y-4 text-slate-800 dark:text-slate-100`}
+              className={`w-full min-w-[900px] p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 ${themeObj.containerBorder} space-y-4 text-slate-800 dark:text-slate-100`}
             >
               {/* Export Header Info */}
               <div className="flex items-center justify-between border-b-2 border-slate-100 dark:border-slate-800 pb-3">
@@ -283,38 +283,48 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                       </div>
 
                       {/* Items */}
-                      <div className="my-1 space-y-1">
-                        {/* Trips */}
-                        {dayTrips.slice(0, 2).map((t, i) => {
-                          const routeStr = t.origin && t.destination
-                            ? `${t.origin}→${t.destination}`
-                            : t.destination || t.transport;
+                      <div className="my-1 space-y-1 flex-1">
+                        {/* Render ALL Trips for the day */}
+                        {dayTrips.map((t, i) => {
+                          const originStr = t.origin || '始发';
+                          const destStr = t.destination || '到达';
+                          const transportIcon = t.transport === '飞机' ? '✈️' : t.transport === '高铁' || t.transport === '火车' ? '🚄' : '🚗';
 
                           return (
                             <div
                               key={`exp-t-${t.id}-${i}`}
-                              className={`p-1 rounded-md text-[9px] font-bold ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder}`}
+                              className={`p-1.5 rounded-lg text-[9.5px] font-extrabold ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} shadow-2xs space-y-0.5`}
                             >
-                              <div className="flex items-center justify-between truncate">
-                                <span className="truncate">✈️ {routeStr}</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="flex items-center gap-1 min-w-0 flex-1 leading-snug break-all">
+                                  <span>{transportIcon}</span>
+                                  <span className="text-slate-900 dark:text-slate-100 font-extrabold">
+                                    {originStr} <span className="text-emerald-600 font-normal">→</span> {destStr}
+                                  </span>
+                                </span>
                                 {calendarDisplayConfig.showTripTicketCost && (
-                                  <span className="font-mono text-[8.5px] ml-1 shrink-0">
+                                  <span className="font-mono text-[9px] font-black shrink-0 text-emerald-700 dark:text-emerald-300">
                                     ¥{t.amount}
                                   </span>
                                 )}
                               </div>
-                              {calendarDisplayConfig.showTripStartTime && t.startTime && (
-                                <div className="text-[8px] opacity-80 font-mono">
-                                  🕒 {t.startTime}
-                                </div>
-                              )}
+                              <div className="flex items-center justify-between text-[8.5px] opacity-80 font-mono pt-0.5">
+                                {calendarDisplayConfig.showTripStartTime && t.startTime && (
+                                  <span>🕒 {t.startTime}</span>
+                                )}
+                                {t.transport && (
+                                  <span className="px-1 rounded bg-slate-200/50 dark:bg-slate-700/50 font-sans font-bold">
+                                    {t.transport}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
 
-                        {/* Expenses (if enabled) */}
+                        {/* Render ALL Expenses for the day (if enabled) */}
                         {calendarDisplayConfig.showExpenses &&
-                          dayExpenses.slice(0, 2 - Math.min(dayTrips.length, 2)).map((exp, i) => (
+                          dayExpenses.map((exp, i) => (
                             <div
                               key={`exp-e-${exp.id}-${i}`}
                               className="p-1 rounded-md text-[9px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-900/40 flex items-center justify-between"

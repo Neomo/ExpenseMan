@@ -16,6 +16,7 @@ export interface CityStationRecord {
 }
 
 export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
+  // 湖北省城市 (优先完整配置)
   {
     id: 'city-wuhan',
     cityName: '武汉',
@@ -28,8 +29,204 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
       { id: 'st-wuhan-wuchang', name: '武昌站', lat: 30.5317, lng: 114.3168 },
       { id: 'st-wuhan-east', name: '武汉东站', lat: 30.4901, lng: 114.4285 },
       { id: 'st-wuhan-hanchuan', name: '汉川站', lat: 30.6385, lng: 113.8421 },
+      { id: 'st-wuhan-tianhe', name: '天河机场站', lat: 30.7712, lng: 114.2185 },
     ],
   },
+  {
+    id: 'city-huangshi',
+    cityName: '黄石',
+    province: '湖北',
+    cityLat: 30.2012,
+    cityLng: 115.0182,
+    stations: [
+      { id: 'st-hs-main', name: '黄石站', lat: 30.2012, lng: 115.0182 },
+      { id: 'st-hs-north', name: '黄石北站', lat: 30.2285, lng: 115.0428 },
+      { id: 'st-hs-daye', name: '大冶北站', lat: 30.1288, lng: 114.9812 },
+    ],
+  },
+  {
+    id: 'city-shiyan',
+    cityName: '十堰',
+    province: '湖北',
+    cityLat: 32.647,
+    cityLng: 110.798,
+    stations: [
+      { id: 'st-sy-shiyandong', name: '十堰东站', lat: 32.6688, lng: 110.8588 },
+      { id: 'st-sy-shiyan', name: '十堰站', lat: 32.6388, lng: 110.7888 },
+      { id: 'st-sy-danjiangkou', name: '丹江口站', lat: 32.5512, lng: 111.5128 },
+      { id: 'st-sy-wudangshan', name: '武当山西站', lat: 32.5382, lng: 111.0852 },
+    ],
+  },
+  {
+    id: 'city-yichang',
+    cityName: '宜昌',
+    province: '湖北',
+    cityLat: 30.692,
+    cityLng: 111.286,
+    stations: [
+      { id: 'st-yc-yichangdong', name: '宜昌东站', lat: 30.6688, lng: 111.3688 },
+      { id: 'st-yc-main', name: '宜昌站', lat: 30.6985, lng: 111.2912 },
+      { id: 'st-yc-dangyang', name: '当阳站', lat: 30.8212, lng: 111.7852 },
+      { id: 'st-yc-zhijiang', name: '枝江北站', lat: 30.4482, lng: 111.7612 },
+    ],
+  },
+  {
+    id: 'city-xiangyang',
+    cityName: '襄阳',
+    province: '湖北',
+    cityLat: 32.009,
+    cityLng: 112.122,
+    stations: [
+      { id: 'st-xy-xiangyangdong', name: '襄阳东站', lat: 32.0288, lng: 112.2288 },
+      { id: 'st-xy-xiangyang', name: '襄阳站', lat: 32.0488, lng: 112.1488 },
+      { id: 'st-xy-xiangzhou', name: '襄州站', lat: 32.0912, lng: 112.1852 },
+      { id: 'st-xy-zaoyang', name: '枣阳站', lat: 32.1312, lng: 112.7682 },
+    ],
+  },
+  {
+    id: 'city-ezhou',
+    cityName: '鄂州',
+    province: '湖北',
+    cityLat: 30.3882,
+    cityLng: 114.8912,
+    stations: [
+      { id: 'st-[#52c488]-main', name: '鄂州站', lat: 30.3882, lng: 114.8912 },
+      { id: 'st-[#52c488]-east', name: '鄂州东站', lat: 30.3712, lng: 114.9218 },
+      { id: 'st-[#52c488]-huahu', name: '花湖机场站', lat: 30.3182, lng: 115.0312 },
+    ],
+  },
+  {
+    id: 'city-jingmen',
+    cityName: '荆门',
+    province: '湖北',
+    cityLat: 31.0358,
+    cityLng: 112.2028,
+    stations: [
+      { id: 'st-jm-main', name: '荆门站', lat: 31.0358, lng: 112.2028 },
+      { id: 'st-jm-west', name: '荆门西站', lat: 31.0218, lng: 112.1612 },
+      { id: 'st-jm-zhongxiang', name: '钟祥站', lat: 31.1682, lng: 112.5852 },
+    ],
+  },
+  {
+    id: 'city-xiaogan',
+    cityName: '孝感',
+    province: '湖北',
+    cityLat: 30.9282,
+    cityLng: 113.9218,
+    stations: [
+      { id: 'st-[#52c488]g-main', name: '孝感站', lat: 30.9282, lng: 113.9218 },
+      { id: 'st-[#52c488]g-east', name: '孝感东站', lat: 30.9128, lng: 113.9582 },
+      { id: 'st-[#52c488]g-north', name: '孝感北站', lat: 31.3288, lng: 113.9852 },
+      { id: 'st-[#52c488]g-yingcheng', name: '应城站', lat: 30.9312, lng: 113.5812 },
+    ],
+  },
+  {
+    id: 'city-jingzhou',
+    cityName: '荆州',
+    province: '湖北',
+    cityLat: 30.3582,
+    cityLng: 112.2185,
+    stations: [
+      { id: 'st-jz-main', name: '荆州站', lat: 30.3582, lng: 112.2185 },
+      { id: 'st-jz-songzi', name: '松滋站', lat: 30.1712, lng: 111.7582 },
+      { id: 'st-jz-shishou', name: '石首站', lat: 29.7212, lng: 112.4218 },
+    ],
+  },
+  {
+    id: 'city-huanggang',
+    cityName: '黄冈',
+    province: '湖北',
+    cityLat: 30.4418,
+    cityLng: 114.8821,
+    stations: [
+      { id: 'st-hg-main', name: '黄冈站', lat: 30.4418, lng: 114.8821 },
+      { id: 'st-hg-east', name: '黄冈东站', lat: 30.4285, lng: 114.9218 },
+      { id: 'st-hg-west', name: '黄冈西站', lat: 30.4582, lng: 114.8512 },
+      { id: 'st-hg-macheng', name: '麻城北站', lat: 31.2012, lng: 115.0218 },
+    ],
+  },
+  {
+    id: 'city-xianning',
+    cityName: '咸宁',
+    province: '湖北',
+    cityLat: 29.8512,
+    cityLng: 114.3218,
+    stations: [
+      { id: 'st-xn-main', name: '咸宁站', lat: 29.8512, lng: 114.3218 },
+      { id: 'st-xn-north', name: '咸宁北站', lat: 29.8912, lng: 114.3482 },
+      { id: 'st-xn-south', name: '咸宁南站', lat: 29.8218, lng: 114.3128 },
+      { id: 'st-xn-chibi', name: '赤壁北站', lat: 29.7282, lng: 113.8852 },
+    ],
+  },
+  {
+    id: 'city-suizhou',
+    cityName: '随州',
+    province: '湖北',
+    cityLat: 31.69,
+    cityLng: 113.3828,
+    stations: [
+      { id: 'st-sz-suizhounan', name: '随州南站', lat: 31.6588, lng: 113.3988 },
+      { id: 'st-sz-suizhou', name: '随州站', lat: 31.7088, lng: 113.3788 },
+      { id: 'st-sz-guangshui', name: '广水站', lat: 31.6218, lng: 113.8218 },
+    ],
+  },
+  {
+    id: 'city-enshi',
+    cityName: '恩施',
+    province: '湖北',
+    cityLat: 30.3182,
+    cityLng: 109.4882,
+    stations: [
+      { id: 'st-es-main', name: '恩施站', lat: 30.3182, lng: 109.4882 },
+      { id: 'st-es-lichuan', name: '利川站', lat: 30.2982, lng: 108.9382 },
+      { id: 'st-es-jianshi', name: '建始站', lat: 30.6012, lng: 109.7182 },
+    ],
+  },
+  {
+    id: 'city-xiantao',
+    cityName: '仙桃',
+    province: '湖北',
+    cityLat: 30.3412,
+    cityLng: 113.4512,
+    stations: [
+      { id: 'st-xt-main', name: '仙桃站', lat: 30.3412, lng: 113.4512 },
+      { id: 'st-xt-west', name: '仙桃西站', lat: 30.2912, lng: 113.1852 },
+    ],
+  },
+  {
+    id: 'city-qianjiang',
+    cityName: '潜江',
+    province: '湖北',
+    cityLat: 30.3882,
+    cityLng: 112.8982,
+    stations: [
+      { id: 'st-qj-main', name: '潜江站', lat: 30.3882, lng: 112.8982 },
+    ],
+  },
+  {
+    id: 'city-tianmen',
+    cityName: '天门',
+    province: '湖北',
+    cityLat: 30.6882,
+    cityLng: 113.1218,
+    stations: [
+      { id: 'st-tm-south', name: '天门南站', lat: 30.3182, lng: 113.1852 },
+      { id: 'st-tm-main', name: '天门站', lat: 30.6882, lng: 113.1218 },
+      { id: 'st-tm-north', name: '天门北站', lat: 30.7182, lng: 113.1482 },
+    ],
+  },
+  {
+    id: 'city-shennongjia',
+    cityName: '神农架',
+    province: '湖北',
+    cityLat: 31.7482,
+    cityLng: 110.6782,
+    stations: [
+      { id: 'st-snj-main', name: '神农架站', lat: 31.7482, lng: 110.6782 },
+    ],
+  },
+
+  // 其他主要省市及铁路枢纽
   {
     id: 'city-beijing',
     cityName: '北京',
@@ -38,7 +235,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
     cityLng: 116.4074,
     stations: [
       { id: 'st-bj-main', name: '北京站', lat: 39.9029, lng: 116.4271 },
-      { id: 'st-bj-[#52c488]', name: '北京西站', lat: 39.8949, lng: 116.3222 },
+      { id: 'st-bj-west', name: '北京西站', lat: 39.8949, lng: 116.3222 },
       { id: 'st-bj-south', name: '北京南站', lat: 39.8652, lng: 116.3785 },
       { id: 'st-bj-north', name: '北京北站', lat: 39.9419, lng: 116.3533 },
       { id: 'st-bj-qinghe', name: '清河站', lat: 40.0298, lng: 116.3314 },
@@ -55,7 +252,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
       { id: 'st-sh-hongqiao', name: '上海虹桥站', lat: 31.1945, lng: 121.3204 },
       { id: 'st-sh-main', name: '上海站', lat: 31.2497, lng: 121.4557 },
       { id: 'st-sh-south', name: '上海南站', lat: 31.1539, lng: 121.4296 },
-      { id: 'st-sh-[#52c488]', name: '上海西站', lat: 31.2618, lng: 121.4011 },
+      { id: 'st-sh-west', name: '上海西站', lat: 31.2618, lng: 121.4011 },
     ],
   },
   {
@@ -68,7 +265,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
       { id: 'st-gz-south', name: '广州南站', lat: 22.9889, lng: 113.2688 },
       { id: 'st-gz-main', name: '广州站', lat: 23.1486, lng: 113.2578 },
       { id: 'st-gz-east', name: '广州东站', lat: 23.1498, lng: 113.3248 },
-      { id: 'st-gz-[#52c488]cloud', name: '广州白云站', lat: 23.1878, lng: 113.2562 },
+      { id: 'st-gz-baiyun', name: '广州白云站', lat: 23.1878, lng: 113.2562 },
     ],
   },
   {
@@ -93,7 +290,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
       { id: 'st-hz-east', name: '杭州东站', lat: 30.2908, lng: 120.2131 },
       { id: 'st-hz-main', name: '杭州站', lat: 30.2464, lng: 120.1802 },
       { id: 'st-hz-south', name: '杭州南站', lat: 30.1708, lng: 120.2721 },
-      { id: 'st-hz-[#52c488]', name: '杭州西站', lat: 30.2788, lng: 119.9608 },
+      { id: 'st-hz-west', name: '杭州西站', lat: 30.2788, lng: 119.9608 },
     ],
   },
   {
@@ -105,7 +302,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
     stations: [
       { id: 'st-cd-east', name: '成都东站', lat: 30.6288, lng: 104.1412 },
       { id: 'st-cd-south', name: '成都南站', lat: 30.6038, lng: 104.0678 },
-      { id: 'st-cd-[#52c488]', name: '成都西站', lat: 30.6728, lng: 103.9688 },
+      { id: 'st-cd-west', name: '成都西站', lat: 30.6728, lng: 103.9688 },
       { id: 'st-cd-main', name: '成都站', lat: 30.6978, lng: 104.0728 },
     ],
   },
@@ -139,7 +336,7 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
     cityLng: 106.5516,
     stations: [
       { id: 'st-cq-north', name: '重庆北站', lat: 29.6058, lng: 106.5512 },
-      { id: 'st-cq-[#52c488]', name: '重庆西站', lat: 29.5218, lng: 106.4258 },
+      { id: 'st-cq-west', name: '重庆西站', lat: 29.5218, lng: 106.4258 },
       { id: 'st-cq-main', name: '重庆站', lat: 29.5488, lng: 106.5488 },
     ],
   },
@@ -177,49 +374,6 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
     ],
   },
   {
-    id: 'city-suizhou',
-    cityName: '随州',
-    province: '湖北',
-    cityLat: 31.69,
-    cityLng: 113.3828,
-    stations: [
-      { id: 'st-sz-suizhounan', name: '随州南站', lat: 31.6588, lng: 113.3988 },
-      { id: 'st-sz-suizhou', name: '随州站', lat: 31.7088, lng: 113.3788 },
-    ],
-  },
-  {
-    id: 'city-shiyan',
-    cityName: '十堰',
-    province: '湖北',
-    cityLat: 32.647,
-    cityLng: 110.798,
-    stations: [
-      { id: 'st-sy-shiyandong', name: '十堰东站', lat: 32.6688, lng: 110.8588 },
-      { id: 'st-sy-shiyan', name: '十堰站', lat: 32.6388, lng: 110.7888 },
-    ],
-  },
-  {
-    id: 'city-xiangyang',
-    cityName: '襄阳',
-    province: '湖北',
-    cityLat: 32.009,
-    cityLng: 112.122,
-    stations: [
-      { id: 'st-xy-xiangyangdong', name: '襄阳东站', lat: 32.0288, lng: 112.2288 },
-      { id: 'st-xy-xiangyang', name: '襄阳站', lat: 32.0488, lng: 112.1488 },
-    ],
-  },
-  {
-    id: 'city-yichang',
-    cityName: '宜昌',
-    province: '湖北',
-    cityLat: 30.692,
-    cityLng: 111.286,
-    stations: [
-      { id: 'st-yc-yichangdong', name: '宜昌东站', lat: 30.6688, lng: 111.3688 },
-    ],
-  },
-  {
     id: 'city-suzhou-js',
     cityName: '苏州',
     province: '江苏',
@@ -254,3 +408,4 @@ export const DEFAULT_CITY_STATION_RECORDS: CityStationRecord[] = [
     ],
   },
 ];
+

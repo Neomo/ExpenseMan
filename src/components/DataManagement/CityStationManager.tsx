@@ -13,6 +13,8 @@ import {
   X,
   Check,
   Globe,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export const CityStationManager: React.FC = () => {
@@ -26,6 +28,7 @@ export const CityStationManager: React.FC = () => {
     resetCityStationsToDefault,
   } = useAppStore();
 
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals / Form States
@@ -130,11 +133,14 @@ export const CityStationManager: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-5">
+    <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-3 cursor-pointer select-none group"
+        >
+          <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 group-hover:scale-105 transition-transform">
             <Building2 className="w-6 h-6" />
           </div>
           <div>
@@ -145,52 +151,77 @@ export const CityStationManager: React.FC = () => {
               </span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              可在此自定义修正城市经纬度、关联火车站别名及映射关联，以精准渲染地图动线
+              已优先补充湖北省全部地级市火车站数据及精确定位，点击右侧可展开/折叠校准数据
             </p>
           </div>
         </div>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search Box */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜索城市或火车站..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none w-44"
-            />
-          </div>
-
+        {/* Collapse Toggle Button */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={handleOpenAddCity}
-            className="px-3.5 py-1.5 rounded-xl bg-[#52c488] hover:bg-[#3d9e6c] text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all border-b-2 border-[#328359]"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4" />
-            <span>新增城市</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('确认重置城市火车站数据库为标准预设记录？此操作将恢复全国主要城市车站配对。')) {
-                resetCityStationsToDefault();
-              }
-            }}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-bold text-xs flex items-center gap-1 transition-colors"
-            title="恢复默认库"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
-            <span>恢复默认库</span>
+            {isCollapsed ? (
+              <>
+                <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>展开数据库校准</span>
+              </>
+            ) : (
+              <>
+                <ChevronUp className="w-4 h-4 text-slate-500" />
+                <span>收起折叠</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* City & Station Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {!isCollapsed && (
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-fade-in">
+          {/* Action Tools Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+            {/* Search Box */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="搜索城市或火车站 (如: 武汉、汉口站)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenAddCity}
+                className="px-3.5 py-1.5 rounded-xl bg-[#52c488] hover:bg-[#3d9e6c] text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all border-b-2 border-[#328359]"
+              >
+                <Plus className="w-4 h-4" />
+                <span>新增城市</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('确认重置城市火车站数据库为标准预设记录？此操作将恢复全国及湖北省主要城市车站配对。')) {
+                    resetCityStationsToDefault();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs flex items-center gap-1 border border-slate-200 dark:border-slate-700 transition-colors"
+                title="恢复默认库"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
+                <span>重置为官方预设库</span>
+              </button>
+            </div>
+          </div>
+
+          {/* City & Station Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-1">
         {filteredCityStations.length === 0 ? (
           <div className="col-span-full py-12 text-center text-slate-400 text-xs">
             未检索到相关城市或火车站映射数据
@@ -291,6 +322,8 @@ export const CityStationManager: React.FC = () => {
           ))
         )}
       </div>
+    </div>
+  )}
 
       {/* Add / Edit City Modal */}
       {cityModalOpen && (

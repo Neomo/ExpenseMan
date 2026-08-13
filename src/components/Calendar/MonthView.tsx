@@ -133,22 +133,23 @@ export const MonthView: React.FC = () => {
               )}
 
               {/* Day Content Area */}
-              <div className="my-1 space-y-1.5 flex-1 overflow-hidden">
+              <div className="my-1 space-y-1.5 flex-1">
                 {/* Trip items preview */}
                 {dayTrips.slice(0, 2).map((t, i) => {
-                  const routeStr = t.origin && t.destination
-                    ? `${t.origin}→${t.destination}`
-                    : t.destination || t.transport;
+                  const originStr = t.origin || '始发';
+                  const destStr = t.destination || '到达';
 
                   return (
                     <div
                       key={`month-trip-${t.id}-${i}`}
-                      className={`p-1.5 rounded-xl ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} text-[10px] space-y-0.5`}
+                      className={`p-1.5 rounded-xl ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} text-[10px] space-y-0.5 shadow-2xs`}
                     >
-                      <div className="flex items-center justify-between font-extrabold truncate">
-                        <span className="flex items-center gap-1 truncate">
-                          <Plane className="w-3 h-3 shrink-0 transform -rotate-45 opacity-80" />
-                          <span className="truncate">{routeStr}</span>
+                      <div className="flex items-center justify-between font-extrabold gap-1">
+                        <span className="flex items-center gap-1 min-w-0 flex-1">
+                          <Plane className="w-3 h-3 shrink-0 transform -rotate-45 text-emerald-600 dark:text-emerald-400" />
+                          <span className="font-extrabold text-slate-800 dark:text-slate-100 leading-snug break-all text-[10.5px]">
+                            {originStr} <span className="text-emerald-500 font-normal mx-0.5">→</span> {destStr}
+                          </span>
                         </span>
                         {calendarDisplayConfig.showTripTicketCost && (
                           <span className="font-mono text-[9.5px] font-black shrink-0 ml-1">
@@ -157,8 +158,9 @@ export const MonthView: React.FC = () => {
                         )}
                       </div>
                       {calendarDisplayConfig.showTripStartTime && t.startTime && (
-                        <p className="text-[9px] opacity-80 font-mono flex items-center gap-1">
+                        <p className="text-[9px] opacity-80 font-mono flex items-center gap-1 pt-0.5">
                           <span>🕒 {t.startTime}</span>
+                          {t.transport && <span className="px-1 rounded bg-slate-200/60 dark:bg-slate-700/60 font-sans">{t.transport}</span>}
                         </p>
                       )}
                     </div>
