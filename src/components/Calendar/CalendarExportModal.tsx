@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { getMonthDaysGrid, sortTripsByStartTime } from '../../utils/dateUtils';
 import { CALENDAR_THEMES } from '../../utils/calendarThemes';
+import { CalendarThemeKey } from '../../types';
 import { toPng, toJpeg, toSvg } from 'html-to-image';
 import {
   X,
@@ -10,8 +11,14 @@ import {
   FileCode,
   Calendar,
   Loader2,
-  Check,
   Sparkles,
+  Maximize2,
+  ListOrdered,
+  Receipt,
+  Plane,
+  Check,
+  Palette,
+  Layers,
 } from 'lucide-react';
 
 interface Props {
@@ -35,16 +42,30 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [exportYear, setExportYear] = useState<number>(calendarFocusDate.getFullYear());
   const [exportMonth, setExportMonth] = useState<number>(calendarFocusDate.getMonth() + 1);
 
+  // New Export Customization Options
+  const [canvasWidth, setCanvasWidth] = useState<1100 | 1350 | 1600>(1350);
+  const [selectedTheme, setSelectedTheme] = useState<CalendarThemeKey>(
+    calendarDisplayConfig.theme || 'island'
+  );
+  const [includeTripList, setIncludeTripList] = useState<boolean>(true);
+  const [includeExpenseList, setIncludeExpenseList] = useState<boolean>(true);
+
   if (!isOpen) return null;
 
   const exportDate = new Date(exportYear, exportMonth - 1, 1);
   const daysGrid = getMonthDaysGrid(exportDate);
 
-  const themeObj = CALENDAR_THEMES[calendarDisplayConfig.theme] || CALENDAR_THEMES.island;
+  const themeObj = CALENDAR_THEMES[selectedTheme] || CALENDAR_THEMES.island;
+  const isSkeuomorphic = selectedTheme === 'skeuomorphic';
 
   const currentYYYYMM = `${exportYear}-${String(exportMonth).padStart(2, '0')}`;
-  const monthTrips = trips.filter((t) => t.date.startsWith(currentYYYYMM));
-  const monthExpenses = expenses.filter((e) => e.date.startsWith(currentYYYYMM));
+  const monthTrips = trips
+    .filter((t) => t.date.startsWith(currentYYYYMM))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const monthExpenses = expenses
+    .filter((e) => e.date.startsWith(currentYYYYMM))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const monthTripsTotal = monthTrips.reduce((acc, t) => acc + t.amount, 0);
   const monthExpensesTotal = monthExpenses.reduce((acc, e) => acc + e.amount, 0);
@@ -74,7 +95,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
     try {
       const node = exportRef.current;
-      const fileName = `差旅日历_${exportYear}年${exportMonth}月.${exportFormat}`;
+      const fileName = `差旅核算日历_${exportYear}年${exportMonth}月.${exportFormat}`;
 
       if (exportFormat === 'png') {
         const dataUrl = await toPng(node, { quality: 0.98, cacheBust: true });
@@ -105,7 +126,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 space-y-6 max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 space-y-6 max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
@@ -114,13 +135,13 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <span>导出月度差旅日历</span>
+                <span>高级定制导出差旅日历</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
                   {themeObj.name}
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                可自定义导出指定月份，支持 PNG、JPEG 图片及 SVG 矢量图格式
+                可自定义画布宽度、拟物实体风格、多维度数据统计以及是否附带详细行程费用清单
               </p>
             </div>
           </div>
@@ -133,133 +154,252 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Export Controls Bar */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          {/* Month & Year Selectors */}
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">目标月份:</span>
-            
-            <select
-              value={exportYear}
-              onChange={(e) => setExportYear(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {[2023, 2024, 2025, 2026, 2027, 2028].map((y) => (
-                <option key={y} value={y}>{y} 年</option>
-              ))}
-            </select>
+        {/* Export Controls Toolbar */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+          {/* Row 1: Date & Format Options */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            {/* Target Date */}
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">目标月份:</span>
+              
+              <select
+                value={exportYear}
+                onChange={(e) => setExportYear(Number(e.target.value))}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {[2023, 2024, 2025, 2026, 2027, 2028].map((y) => (
+                  <option key={y} value={y}>{y} 年</option>
+                ))}
+              </select>
 
-            <select
-              value={exportMonth}
-              onChange={(e) => setExportMonth(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{m} 月</option>
-              ))}
-            </select>
+              <select
+                value={exportMonth}
+                onChange={(e) => setExportMonth(Number(e.target.value))}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{m} 月</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Canvas Width Selection */}
+            <div className="flex items-center gap-2">
+              <Maximize2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">画布宽度:</span>
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                {[
+                  { width: 1100, label: '1100px (标准)' },
+                  { width: 1350, label: '1350px (高清)' },
+                  { width: 1600, label: '1600px (超宽)' },
+                ].map((w) => (
+                  <button
+                    key={`w-btn-${w.width}`}
+                    type="button"
+                    onClick={() => setCanvasWidth(w.width as 1100 | 1350 | 1600)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      canvasWidth === w.width
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Export Format Selector Pills */}
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setExportFormat('png')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  exportFormat === 'png'
+                    ? 'bg-[#52c488] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>PNG</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportFormat('jpeg')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  exportFormat === 'jpeg'
+                    ? 'bg-[#52c488] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>JPEG</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportFormat('svg')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  exportFormat === 'svg'
+                    ? 'bg-[#52c488] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>SVG</span>
+              </button>
+            </div>
           </div>
 
-          {/* Format Selector Pills */}
-          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={() => setExportFormat('png')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                exportFormat === 'png'
-                  ? 'bg-[#52c488] text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>PNG 图片</span>
-            </button>
+          {/* Row 2: Theme Selection & Attached Lists Settings */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
+            {/* Style / Theme selector */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Palette className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">视觉风格:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {Object.values(CALENDAR_THEMES).map((t) => {
+                  const isActive = selectedTheme === t.key;
+                  return (
+                    <button
+                      key={`export-theme-${t.key}`}
+                      type="button"
+                      onClick={() => setSelectedTheme(t.key as CalendarThemeKey)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 border transition-all ${
+                        isActive
+                          ? 'border-emerald-500 bg-emerald-500 text-white shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                    >
+                      <span>{t.icon}</span>
+                      <span>{t.name.split(' ')[0]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setExportFormat('jpeg')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                exportFormat === 'jpeg'
-                  ? 'bg-[#52c488] text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>JPEG 图片</span>
-            </button>
+            {/* Attachment checkboxes */}
+            <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+              <label className="flex items-center gap-2 cursor-pointer hover:text-emerald-600 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={includeTripList}
+                  onChange={(e) => setIncludeTripList(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                />
+                <span className="flex items-center gap-1">
+                  <ListOrdered className="w-3.5 h-3.5 text-blue-500" />
+                  <span>附带行程明细清单</span>
+                </span>
+              </label>
 
-            <button
-              type="button"
-              onClick={() => setExportFormat('svg')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                exportFormat === 'svg'
-                  ? 'bg-[#52c488] text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <FileCode className="w-3.5 h-3.5" />
-              <span>矢量 SVG</span>
-            </button>
+              <label className="flex items-center gap-2 cursor-pointer hover:text-emerald-600 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={includeExpenseList}
+                  onChange={(e) => setIncludeExpenseList(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                />
+                <span className="flex items-center gap-1">
+                  <Receipt className="w-3.5 h-3.5 text-amber-500" />
+                  <span>附带日常费用及补贴清单</span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
         {/* Live Export Preview Container */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-            <span>实时导出渲染预览:</span>
-            <span>当前套用设置：{calendarDisplayConfig.showExpenses ? '包含独立费用' : '仅行程信息'} / {calendarDisplayConfig.showDailyTotal ? '含每日合计' : '隐藏每日合计'}</span>
+            <span>实时渲染导出预览 (全高不截断):</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+              渲染尺寸: {canvasWidth}px x 动态自适应高度
+            </span>
           </div>
 
-          <div className="overflow-x-auto p-2 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="overflow-x-auto p-4 bg-slate-200/80 dark:bg-slate-950 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-inner">
             {/* The exported canvas node container */}
             <div
               ref={exportRef}
-              className={`w-full min-w-[900px] p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 ${themeObj.containerBorder} space-y-4 text-slate-800 dark:text-slate-100`}
+              style={{ width: `${canvasWidth}px` }}
+              className={`mx-auto p-8 rounded-2xl bg-white dark:bg-slate-900 border-2 ${themeObj.containerBorder} space-y-6 text-slate-800 dark:text-slate-100 ${
+                isSkeuomorphic ? 'shadow-2xl bg-[#faf6ed] text-[#423223]' : ''
+              }`}
             >
+              {/* Skeuomorphic Ring Loop Binder Top Accent */}
+              {isSkeuomorphic && (
+                <div className="relative -mt-8 -mx-8 mb-6 h-10 bg-gradient-to-r from-[#2c1e14] via-[#4d3623] to-[#2c1e14] rounded-t-xl flex items-center justify-around px-12 border-b-2 border-[#1c120a] shadow-md">
+                  {Array.from({ length: 14 }).map((_, i) => (
+                    <div key={`ring-${i}`} className="relative flex flex-col items-center">
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#120b06] shadow-inner border border-[#523d2a]" />
+                      <div className="absolute -top-4 w-3 h-8 rounded-full bg-gradient-to-r from-[#e6c667] via-[#fff1b8] to-[#9e7a1b] shadow-md border border-[#8c6b12]" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Export Header Info */}
-              <div className="flex items-center justify-between border-b-2 border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{themeObj.icon}</span>
+              <div className={`flex items-center justify-between border-b-2 pb-4 ${isSkeuomorphic ? 'border-[#d1c0a5]' : 'border-slate-100 dark:border-slate-800'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-2xl text-2xl ${isSkeuomorphic ? 'bg-[#e0cfb3] text-[#5c3c1e] border border-[#bd9b71] shadow-xs' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'}`}>
+                    {themeObj.icon}
+                  </div>
                   <div>
-                    <h2 className="text-xl font-black tracking-tight">
-                      {exportYear} 年 {exportMonth} 月差旅日历
+                    <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 ${isSkeuomorphic ? 'font-serif text-[#472d17]' : ''}`}>
+                      <span>{exportYear} 年 {exportMonth} 月差旅记账与核算日历</span>
                     </h2>
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      Generated by 智能差旅日历记账平台 • {new Date().toISOString().split('T')[0]}
+                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                      Smart Travel Calendar Ledger • 生成日期: {new Date().toISOString().split('T')[0]}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-right">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-bold">本月差旅次数</span>
-                    <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+                <div className="flex items-center gap-4 text-right">
+                  <div className={`p-2.5 rounded-xl border ${isSkeuomorphic ? 'bg-[#f0e4cf] border-[#cfbe9d]' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                    <span className="text-[10px] text-slate-400 block font-bold">出差行次数</span>
+                    <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
                       {monthTrips.length} 次
                     </span>
                   </div>
+
                   {calendarDisplayConfig.showDailyTotal && (
-                    <div>
+                    <div className={`p-2.5 rounded-xl border ${isSkeuomorphic ? 'bg-[#f0e4cf] border-[#cfbe9d]' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
                       <span className="text-[10px] text-slate-400 block font-bold">本月消费总计</span>
-                      <span className="text-sm font-black font-mono text-amber-600 dark:text-amber-400">
+                      <span className="text-base font-black font-mono text-amber-600 dark:text-amber-400">
                         ¥{monthGrandTotal.toFixed(2)}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Stamp / Seal for Skeuomorphic theme */}
+                  {isSkeuomorphic && (
+                    <div className="w-16 h-16 rounded-full border-2 border-dashed border-rose-700/80 text-rose-700 flex flex-col items-center justify-center rotate-12 font-serif select-none shrink-0 bg-rose-50/20">
+                      <span className="text-[10px] font-bold">验讫归档</span>
+                      <span className="text-[8px] font-black font-mono">APPROVED</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Export Weekday Header Bar */}
-              <div className={`grid grid-cols-7 border-b ${themeObj.weekdayHeaderBorder} ${themeObj.weekdayHeaderBg} text-center py-2 text-xs font-black ${themeObj.weekdayTextColor} rounded-xl`}>
+              <div className={`grid grid-cols-7 border-b ${themeObj.weekdayHeaderBorder} ${themeObj.weekdayHeaderBg} text-center py-2.5 text-xs font-black ${themeObj.weekdayTextColor} rounded-xl shadow-2xs`}>
                 {WEEKDAYS.map((day, idx) => (
-                  <div key={`exp-wd-${idx}`} className={idx >= 5 ? 'text-rose-500 font-extrabold' : ''}>
+                  <div key={`exp-wd-${idx}`} className={idx >= 5 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : ''}>
                     {day}
                   </div>
                 ))}
               </div>
 
-              {/* Export Days Grid */}
-              <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+              {/* Export Days Grid - Minimal Dynamic Cell Heights */}
+              <div className={`grid grid-cols-7 divide-x divide-y border rounded-xl overflow-hidden ${
+                isSkeuomorphic
+                  ? 'divide-[#dcd0b9] border-[#cfbe9d] bg-[#fdfbf7]'
+                  : 'divide-slate-100 dark:divide-slate-800 border-slate-100 dark:border-slate-800'
+              }`}>
                 {daysGrid.map((cell, idx) => {
                   const dayTrips = sortTripsByStartTime(tripsByDate[cell.dateStr] || []);
                   const dayExpenses = expensesByDate[cell.dateStr] || [];
@@ -271,19 +411,27 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   return (
                     <div
                       key={`exp-cell-${cell.dateStr}-${idx}`}
-                      className={`min-h-[85px] p-1.5 flex flex-col justify-between ${
-                        !cell.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-950/30 text-slate-300 dark:text-slate-700' : 'bg-white dark:bg-slate-900'
+                      className={`min-h-[75px] p-2 flex flex-col justify-between transition-colors ${
+                        !cell.isCurrentMonth
+                          ? isSkeuomorphic
+                            ? 'bg-[#f0e8d8]/60 text-slate-400'
+                            : 'bg-slate-50/50 dark:bg-slate-950/30 text-slate-300 dark:text-slate-700'
+                          : 'bg-white/90 dark:bg-slate-900/90'
                       }`}
                     >
-                      {/* Day Number */}
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-black ${cell.isToday ? 'px-1.5 py-0.5 rounded-md bg-emerald-500 text-white' : ''}`}>
+                      {/* Day Number Header */}
+                      <div className="flex items-center justify-between pb-1">
+                        <span className={`text-xs font-black ${
+                          cell.isToday
+                            ? themeObj.todayBadgeBg + ' ' + themeObj.todayBadgeText + ' px-1.5 py-0.5 rounded-md shadow-xs'
+                            : 'text-slate-700 dark:text-slate-300'
+                        }`}>
                           {cell.dayNumber}
                         </span>
                       </div>
 
-                      {/* Items */}
-                      <div className="my-1 space-y-1 flex-1">
+                      {/* Items Stacking Area */}
+                      <div className="my-1 space-y-1.5 flex-1">
                         {/* Render ALL Trips for the day */}
                         {dayTrips.map((t, i) => {
                           const originStr = t.origin || '始发';
@@ -293,27 +441,27 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                           return (
                             <div
                               key={`exp-t-${t.id}-${i}`}
-                              className={`p-1.5 rounded-lg text-[9.5px] font-extrabold ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} shadow-2xs space-y-0.5`}
+                              className={`p-1.5 rounded-lg text-[10px] font-extrabold ${themeObj.tripBadgeBg} ${themeObj.tripBadgeText} border ${themeObj.tripBadgeBorder} shadow-2xs space-y-0.5`}
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <span className="flex items-center gap-1 min-w-0 flex-1 leading-snug break-all">
                                   <span>{transportIcon}</span>
-                                  <span className="text-slate-900 dark:text-slate-100 font-extrabold">
-                                    {originStr} <span className="text-emerald-600 font-normal">→</span> {destStr}
+                                  <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                                    {originStr} <span className="text-emerald-600 font-normal mx-0.5">→</span> {destStr}
                                   </span>
                                 </span>
                                 {calendarDisplayConfig.showTripTicketCost && (
-                                  <span className="font-mono text-[9px] font-black shrink-0 text-emerald-700 dark:text-emerald-300">
+                                  <span className="font-mono text-[9.5px] font-black shrink-0 text-emerald-700 dark:text-emerald-300 ml-1">
                                     ¥{t.amount}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center justify-between text-[8.5px] opacity-80 font-mono pt-0.5">
+                              <div className="flex items-center justify-between text-[9px] opacity-85 font-mono pt-0.5">
                                 {calendarDisplayConfig.showTripStartTime && t.startTime && (
                                   <span>🕒 {t.startTime}</span>
                                 )}
                                 {t.transport && (
-                                  <span className="px-1 rounded bg-slate-200/50 dark:bg-slate-700/50 font-sans font-bold">
+                                  <span className="px-1 rounded bg-slate-200/60 dark:bg-slate-700/60 font-sans font-bold">
                                     {t.transport}
                                   </span>
                                 )}
@@ -330,30 +478,164 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                               className="p-1 rounded-md text-[9px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-900/40 flex items-center justify-between"
                             >
                               <span className="truncate">🧾 {exp.category}</span>
-                              <span className="font-mono text-[8.5px]">¥{exp.amount}</span>
+                              <span className="font-mono text-[8.5px] font-extrabold">¥{exp.amount}</span>
                             </div>
                           ))}
                       </div>
 
                       {/* Total cost if enabled */}
                       {calendarDisplayConfig.showDailyTotal && totalCost > 0 ? (
-                        <div className="mt-auto pt-0.5 text-right">
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[8.5px] font-mono font-bold">
+                        <div className="mt-auto pt-1 text-right">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-mono font-bold shadow-2xs">
                             ¥{totalCost.toFixed(0)}
                           </span>
                         </div>
-                      ) : (
-                        <div className="mt-auto h-2" />
-                      )}
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
 
+              {/* ATTACHED LIST 1: Trip Details Table */}
+              {includeTripList && (
+                <div className={`p-4 rounded-xl border space-y-3 pt-4 ${
+                  isSkeuomorphic
+                    ? 'bg-[#f7f0e1] border-[#d8c7ab]'
+                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-700">
+                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-blue-600" />
+                      <span>附表一：{exportYear}年{exportMonth}月 行程明细清单 ({monthTrips.length} 项)</span>
+                    </h4>
+                    <span className="text-xs font-black font-mono text-blue-600 dark:text-blue-400">
+                      行程开支小计: ¥{monthTripsTotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {monthTrips.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-2">本月暂无差旅行程记录</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 font-bold text-[11px]">
+                            <th className="py-1.5 px-2 w-10">#</th>
+                            <th className="py-1.5 px-2">日期</th>
+                            <th className="py-1.5 px-2">交通类型</th>
+                            <th className="py-1.5 px-2">车次/航班</th>
+                            <th className="py-1.5 px-2">出发时间</th>
+                            <th className="py-1.5 px-2">起止路线</th>
+                            <th className="py-1.5 px-2 text-right">票面金额</th>
+                            <th className="py-1.5 px-2">备注</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/60 dark:divide-slate-700/60 text-[11px]">
+                          {monthTrips.map((t, idx) => (
+                            <tr key={`att-t-${t.id}-${idx}`}>
+                              <td className="py-1.5 px-2 font-mono text-slate-400">{idx + 1}</td>
+                              <td className="py-1.5 px-2 font-mono font-medium">{t.date}</td>
+                              <td className="py-1.5 px-2">
+                                <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold text-[10px]">
+                                  {t.transport}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-2 font-mono font-bold text-slate-800 dark:text-slate-200">
+                                {t.trainNumber || '-'}
+                              </td>
+                              <td className="py-1.5 px-2 font-mono">{t.startTime || '-'}</td>
+                              <td className="py-1.5 px-2 font-bold text-slate-800 dark:text-slate-100">
+                                {t.origin || '未知'} → {t.destination || '未知'}
+                              </td>
+                              <td className="py-1.5 px-2 text-right font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                ¥{t.amount.toFixed(2)}
+                              </td>
+                              <td className="py-1.5 px-2 text-slate-500 max-w-[150px] truncate">{t.remarks || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ATTACHED LIST 2: Expense Details Table */}
+              {includeExpenseList && (
+                <div className={`p-4 rounded-xl border space-y-3 ${
+                  isSkeuomorphic
+                    ? 'bg-[#f7f0e1] border-[#d8c7ab]'
+                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-700">
+                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-amber-600" />
+                      <span>附表二：{exportYear}年{exportMonth}月 日常费用及补贴清单 ({monthExpenses.length} 项)</span>
+                    </h4>
+                    <span className="text-xs font-black font-mono text-amber-600 dark:text-amber-400">
+                      日常开支小计: ¥{monthExpensesTotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {monthExpenses.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-2">本月暂无其他费用及补贴记录</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 font-bold text-[11px]">
+                            <th className="py-1.5 px-2 w-10">#</th>
+                            <th className="py-1.5 px-2">日期</th>
+                            <th className="py-1.5 px-2">费用类别</th>
+                            <th className="py-1.5 px-2">开支说明/商家</th>
+                            <th className="py-1.5 px-2 text-right">费用金额</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/60 dark:divide-slate-700/60 text-[11px]">
+                          {monthExpenses.map((e, idx) => (
+                            <tr key={`att-e-${e.id}-${idx}`}>
+                              <td className="py-1.5 px-2 font-mono text-slate-400">{idx + 1}</td>
+                              <td className="py-1.5 px-2 font-mono font-medium">{e.date}</td>
+                              <td className="py-1.5 px-2">
+                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[10px]">
+                                  {e.category}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-2 text-slate-700 dark:text-slate-200 font-medium">
+                                {e.description || '-'}
+                              </td>
+                              <td className="py-1.5 px-2 text-right font-mono font-black text-amber-600 dark:text-amber-400">
+                                ¥{e.amount.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Signature & Approval Block */}
+              <div className={`p-4 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-4 font-mono ${
+                isSkeuomorphic
+                  ? 'bg-[#eedebd] border-[#cbb895] text-[#523d29]'
+                  : 'bg-slate-100/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                <div className="flex items-center gap-6">
+                  <span>填报人: ______________</span>
+                  <span>部门审核: ______________</span>
+                  <span>财务复核: ______________</span>
+                </div>
+                <div className="font-bold">
+                  实报实销合计金额: <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">¥{monthGrandTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
               {/* Branding Footer */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center text-[10px] text-slate-400 flex items-center justify-between">
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-center text-[10px] text-slate-400 flex items-center justify-between">
                 <span>🍃 自动归集•智算记账</span>
-                <span>智能差旅日历系统出具</span>
+                <span>智能差旅日历记账平台 出具</span>
               </div>
             </div>
           </div>
@@ -383,7 +665,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>立即导出 {exportFormat.toUpperCase()} 文件</span>
+                <span>立即导出 {exportFormat.toUpperCase()} 高清文件</span>
               </>
             )}
           </button>

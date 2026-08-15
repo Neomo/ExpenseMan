@@ -140,7 +140,7 @@ export interface TripChain {
   themeIndex: number;
 }
 
-export type CalendarThemeKey = 'island' | 'sakura' | 'ocean' | 'maple' | 'winter' | 'slate';
+export type CalendarThemeKey = 'island' | 'sakura' | 'ocean' | 'maple' | 'winter' | 'slate' | 'skeuomorphic';
 
 export interface CalendarDisplayConfig {
   showExpenses: boolean;          // 是否显示非行程费用项
