@@ -46,15 +46,15 @@ export const CalendarView: React.FC = () => {
     <div className="space-y-6">
       <CalendarHeader />
 
-      {/* Main Grid with Calendar on Left (Expanded for Widescreen) and Details Side Panel on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-12 2xl:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-8 xl:col-span-9 2xl:col-span-10 space-y-6">
+      {/* Main Layout with Calendar in Center (Expands to fill) and Details Side Panel on Right */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+        <div className="flex-1 min-w-0 w-full space-y-6">
           {currentViewMode === 'month' && <MonthView />}
           {currentViewMode === 'week' && <WeekView />}
           {currentViewMode === 'day' && <DayView />}
         </div>
 
-        <div className="lg:col-span-4 xl:col-span-3 2xl:col-span-2 sticky top-4">
+        <div className="w-full lg:w-[380px] xl:w-[430px] 2xl:w-[480px] shrink-0 sticky top-24">
           <CalendarRightPanel />
         </div>
       </div>

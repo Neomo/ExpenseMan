@@ -65,7 +65,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-64 xl:w-72 hidden md:flex flex-col border-r-2 border-[#82d8a7]/30 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md h-screen sticky top-0 p-4 shrink-0 transition-all gap-4 overflow-y-auto">
+    <aside className="w-64 xl:w-72 2xl:w-80 hidden md:flex flex-col border-r-2 border-[#82d8a7]/30 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-20 h-[calc(100vh-5rem)] p-4 shrink-0 transition-all gap-4 overflow-y-auto z-20 select-none">
       <div className="px-2 flex items-center justify-between">
         <p className="text-[10px] font-extrabold text-[#789984] dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
           <span>🍃 ISLAND NAVI</span>

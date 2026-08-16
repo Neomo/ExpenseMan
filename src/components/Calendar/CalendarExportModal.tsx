@@ -16,9 +16,9 @@ import {
   ListOrdered,
   Receipt,
   Plane,
-  Check,
   Palette,
-  Layers,
+  Briefcase,
+  Code,
 } from 'lucide-react';
 
 interface Props {
@@ -36,7 +36,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   const exportRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'svg'>('png');
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'svg' | 'html'>('png');
 
   // Export Month selection state
   const [exportYear, setExportYear] = useState<number>(calendarFocusDate.getFullYear());
@@ -49,11 +49,22 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
   );
   const [includeTripList, setIncludeTripList] = useState<boolean>(true);
   const [includeExpenseList, setIncludeExpenseList] = useState<boolean>(true);
+  
+  // Requirement 5: Workdays Only option (Mon-Fri)
+  const [workdaysOnly, setWorkdaysOnly] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
   const exportDate = new Date(exportYear, exportMonth - 1, 1);
-  const daysGrid = getMonthDaysGrid(exportDate);
+  const rawDaysGrid = getMonthDaysGrid(exportDate);
+
+  // Filter grid if workdaysOnly is active
+  const daysGrid = workdaysOnly
+    ? rawDaysGrid.filter((cell) => {
+        const dayOfWeek = cell.date.getDay();
+        return dayOfWeek !== 0 && dayOfWeek !== 6;
+      })
+    : rawDaysGrid;
 
   const themeObj = CALENDAR_THEMES[selectedTheme] || CALENDAR_THEMES.island;
   const isSkeuomorphic = selectedTheme === 'skeuomorphic';
@@ -84,28 +95,311 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
     return acc;
   }, {} as Record<string, typeof expenses>);
 
-  const WEEKDAYS = calendarDisplayConfig.weekdayFormat === 'zh'
-    ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const WEEKDAYS = workdaysOnly
+    ? (calendarDisplayConfig.weekdayFormat === 'zh'
+        ? ['周一', '周二', '周三', '周四', '周五']
+        : ['MON', 'TUE', 'WED', 'THU', 'FRI'])
+    : (calendarDisplayConfig.weekdayFormat === 'zh'
+        ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
+
+  // Generate complete standalone HTML report
+  const generateHtmlReport = (): string => {
+    const weekdayColsHtml = WEEKDAYS.map((day, idx) => {
+      const isWeekend = !workdaysOnly && idx >= 5;
+      return `<th style="padding: 10px 6px; text-align: center; font-size: 13px; font-weight: 700; color: ${isWeekend ? '#e11d48' : '#2d3748'}; background-color: #f0fdf4; border: 1px solid #d1fae5;">${day}</th>`;
+    }).join('');
+
+    const gridRowsHtml: string[] = [];
+    const colCount = workdaysOnly ? 5 : 7;
+
+    for (let i = 0; i < daysGrid.length; i += colCount) {
+      const rowCells = daysGrid.slice(i, i + colCount);
+      const cellsHtml = rowCells.map((cell) => {
+        const dTrips = sortTripsByStartTime(tripsByDate[cell.dateStr] || []);
+        const dExpenses = expensesByDate[cell.dateStr] || [];
+        const dCost = dTrips.reduce((sum, t) => sum + t.amount, 0) + dExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        const tripsHtml = dTrips.map((t) => {
+          const originStr = t.origin || '始发';
+          const destStr = t.destination || '到达';
+          const tIcon = t.transport === '飞机' ? '✈️' : (t.transport === '高铁' || t.transport === '火车' ? '🚄' : '🚗');
+          return `
+            <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 6px; margin-bottom: 4px; font-size: 11px; line-height: 1.3;">
+              <div style="display: flex; justify-content: space-between; font-weight: 700; color: #0369a1;">
+                <span>${tIcon} ${originStr} → ${destStr}</span>
+                <span style="color: #0284c7; font-family: monospace;">¥${t.amount.toFixed(1)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 2px;">
+                <span>${t.startTime ? '🕒 ' + t.startTime : ''} ${t.trainNumber || ''}</span>
+                <span style="background-color: #e0f2fe; padding: 1px 4px; border-radius: 3px;">${t.transport}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const expHtml = calendarDisplayConfig.showExpenses ? dExpenses.map((exp) => `
+          <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 5px; padding: 3px 5px; margin-bottom: 3px; font-size: 10px; display: flex; justify-content: space-between; color: #92400e;">
+            <span>🧾 ${exp.category}</span>
+            <span style="font-family: monospace; font-weight: bold;">¥${exp.amount.toFixed(1)}</span>
+          </div>
+        `).join('') : '';
+
+        const costBadgeHtml = calendarDisplayConfig.showDailyTotal && dCost > 0
+          ? `<div style="text-align: right; margin-top: 4px;"><span style="background-color: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;">¥${dCost.toFixed(0)}</span></div>`
+          : '';
+
+        return `
+          <td style="vertical-align: top; width: ${100 / colCount}%; min-height: 80px; padding: 6px; border: 1px solid #e2e8f0; background-color: ${cell.isCurrentMonth ? '#ffffff' : '#f8fafc'};">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: ${cell.isToday ? '#059669' : '#475569'};">
+              <span>${cell.dayNumber}</span>
+              ${cell.isToday ? '<span style="font-size: 9px; background-color: #d1fae5; color: #065f46; padding: 1px 4px; border-radius: 3px;">今日</span>' : ''}
+            </div>
+            <div>${tripsHtml}${expHtml}${costBadgeHtml}</div>
+          </td>
+        `;
+      }).join('');
+
+      gridRowsHtml.push(`<tr>${cellsHtml}</tr>`);
+    }
+
+    // Attached Trip List HTML
+    let attachedTripTableHtml = '';
+    if (includeTripList) {
+      const tripRows = monthTrips.map((t, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+          <td style="padding: 6px 8px; color: #64748b; font-family: monospace;">${idx + 1}</td>
+          <td style="padding: 6px 8px; font-family: monospace;">${t.date}</td>
+          <td style="padding: 6px 8px;"><span style="background-color: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${t.transport}</span></td>
+          <td style="padding: 6px 8px; font-weight: bold; font-family: monospace;">${t.trainNumber || '-'}</td>
+          <td style="padding: 6px 8px; font-family: monospace;">${t.startTime || '-'}</td>
+          <td style="padding: 6px 8px; font-weight: bold;">${t.origin || '-'} → ${t.destination || '-'}</td>
+          <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">¥${t.amount.toFixed(2)}</td>
+          <td style="padding: 6px 8px; color: #64748b;">${t.remarks || '-'}</td>
+        </tr>
+      `).join('');
+
+      attachedTripTableHtml = `
+        <div style="margin-top: 24px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; background-color: #f8fafc;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a;">✈️ 附表一：${exportYear}年${exportMonth}月 行程明细清单 (${monthTrips.length} 项)</h3>
+            <span style="font-size: 13px; font-weight: bold; font-family: monospace; color: #0284c7;">行程开支小计: ¥${monthTripsTotal.toFixed(2)}</span>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="background-color: #f1f5f9; color: #475569; font-size: 11px; font-weight: bold;">
+                <th style="padding: 6px 8px; width: 40px;">#</th>
+                <th style="padding: 6px 8px;">日期</th>
+                <th style="padding: 6px 8px;">交通类型</th>
+                <th style="padding: 6px 8px;">车次/航班</th>
+                <th style="padding: 6px 8px;">出发时间</th>
+                <th style="padding: 6px 8px;">起止路线</th>
+                <th style="padding: 6px 8px; text-align: right;">票面金额</th>
+                <th style="padding: 6px 8px;">备注</th>
+              </tr>
+            </thead>
+            <tbody>${tripRows || '<tr><td colspan="8" style="text-align: center; padding: 12px; color: #94a3b8;">暂无记录</td></tr>'}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Attached Expense List HTML
+    let attachedExpenseTableHtml = '';
+    if (includeExpenseList) {
+      const expRows = monthExpenses.map((e, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+          <td style="padding: 6px 8px; color: #64748b; font-family: monospace;">${idx + 1}</td>
+          <td style="padding: 6px 8px; font-family: monospace;">${e.date}</td>
+          <td style="padding: 6px 8px;"><span style="background-color: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${e.category}</span></td>
+          <td style="padding: 6px 8px; color: #334155;">${e.description || '-'}</td>
+          <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: bold; color: #d97706;">¥${e.amount.toFixed(2)}</td>
+        </tr>
+      `).join('');
+
+      attachedExpenseTableHtml = `
+        <div style="margin-top: 16px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; background-color: #f8fafc;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a;">🪙 附表二：${exportYear}年${exportMonth}月 日常费用及补贴清单 (${monthExpenses.length} 项)</h3>
+            <span style="font-size: 13px; font-weight: bold; font-family: monospace; color: #d97706;">日常开支小计: ¥${monthExpensesTotal.toFixed(2)}</span>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="background-color: #f1f5f9; color: #475569; font-size: 11px; font-weight: bold;">
+                <th style="padding: 6px 8px; width: 40px;">#</th>
+                <th style="padding: 6px 8px;">日期</th>
+                <th style="padding: 6px 8px;">费用类别</th>
+                <th style="padding: 6px 8px;">开支说明/商家</th>
+                <th style="padding: 6px 8px; text-align: right;">费用金额</th>
+              </tr>
+            </thead>
+            <tbody>${expRows || '<tr><td colspan="5" style="text-align: center; padding: 12px; color: #94a3b8;">暂无记录</td></tr>'}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>差旅核算日历_${exportYear}年${exportMonth}月</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      margin: 0;
+      padding: 24px;
+    }
+    .report-container {
+      max-width: ${canvasWidth}px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border: 2px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    }
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .report-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .report-subtitle {
+      margin: 4px 0 0 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .stats-box {
+      display: flex;
+      gap: 12px;
+    }
+    .stat-badge {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 8px;
+      text-align: right;
+    }
+    .calendar-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+    }
+    .sign-block {
+      margin-top: 20px;
+      padding: 14px 18px;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #475569;
+    }
+    .sign-fields {
+      display: flex;
+      gap: 24px;
+    }
+    @media print {
+      body { background: none; padding: 0; }
+      .report-container { box-shadow: none; border: none; max-width: 100%; padding: 0; }
+      @page { size: landscape; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="report-container">
+    <div class="report-header">
+      <div>
+        <h1 class="report-title">🍃 ${exportYear} 年 ${exportMonth} 月 差旅记账与核算日历 ${workdaysOnly ? '(工作日版)' : ''}</h1>
+        <p class="report-subtitle">Smart Travel Ledger • 生成时间: ${new Date().toLocaleString('zh-CN')}</p>
+      </div>
+      <div class="stats-box">
+        <div class="stat-badge">
+          <div style="font-size: 10px; color: #64748b;">差旅总次数</div>
+          <div style="font-size: 16px; font-weight: bold; color: #0284c7; font-family: monospace;">${monthTrips.length} 次</div>
+        </div>
+        <div class="stat-badge">
+          <div style="font-size: 10px; color: #64748b;">本月核算总额</div>
+          <div style="font-size: 16px; font-weight: bold; color: #d97706; font-family: monospace;">¥${monthGrandTotal.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="calendar-table">
+      <thead>
+        <tr>${weekdayColsHtml}</tr>
+      </thead>
+      <tbody>
+        ${gridRowsHtml.join('')}
+      </tbody>
+    </table>
+
+    ${attachedTripTableHtml}
+    ${attachedExpenseTableHtml}
+
+    <div class="sign-block">
+      <div class="sign-fields">
+        <span>填报人: ________________</span>
+        <span>部门审核: ________________</span>
+        <span>财务复核: ________________</span>
+      </div>
+      <div style="font-weight: bold;">
+        实报实销核准金额: <span style="font-size: 16px; color: #059669; font-family: monospace;">¥${monthGrandTotal.toFixed(2)}</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; text-align: center; font-size: 10px; color: #94a3b8;">
+      动森差旅日历系统 出具 • 遵照财务合规报销标准
+    </div>
+  </div>
+</body>
+</html>`;
+  };
 
   // Handle Export File Generation & Download
   const handleExport = async () => {
-    if (!exportRef.current) return;
     setIsExporting(true);
 
     try {
-      const node = exportRef.current;
-      const fileName = `差旅核算日历_${exportYear}年${exportMonth}月.${exportFormat}`;
+      const fileName = `差旅核算日历_${exportYear}年${exportMonth}月_${workdaysOnly ? '工作日_' : ''}.${exportFormat}`;
 
-      if (exportFormat === 'png') {
-        const dataUrl = await toPng(node, { quality: 0.98, cacheBust: true });
-        downloadDataUrl(dataUrl, fileName);
-      } else if (exportFormat === 'jpeg') {
-        const dataUrl = await toJpeg(node, { quality: 0.95, cacheBust: true });
-        downloadDataUrl(dataUrl, fileName);
-      } else if (exportFormat === 'svg') {
-        const dataUrl = await toSvg(node, { cacheBust: true });
-        downloadDataUrl(dataUrl, fileName);
+      if (exportFormat === 'html') {
+        const htmlContent = generateHtmlReport();
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        downloadDataUrl(url, fileName);
+        URL.revokeObjectURL(url);
+      } else {
+        if (!exportRef.current) return;
+        const node = exportRef.current;
+
+        if (exportFormat === 'png') {
+          const dataUrl = await toPng(node, { quality: 0.98, cacheBust: true });
+          downloadDataUrl(dataUrl, fileName);
+        } else if (exportFormat === 'jpeg') {
+          const dataUrl = await toJpeg(node, { quality: 0.95, cacheBust: true });
+          downloadDataUrl(dataUrl, fileName);
+        } else if (exportFormat === 'svg') {
+          const dataUrl = await toSvg(node, { cacheBust: true });
+          downloadDataUrl(dataUrl, fileName);
+        }
       }
     } catch (err) {
       console.error('Failed to export calendar:', err);
@@ -125,8 +419,9 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 space-y-6 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+      {/* Expanded Modal Box */}
+      <div className="w-full max-w-[96vw] 2xl:max-w-[1560px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-5 sm:p-7 space-y-5 max-h-[94vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
@@ -134,14 +429,19 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <Download className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                 <span>高级定制导出差旅日历</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
                   {themeObj.name}
                 </span>
+                {workdaysOnly && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 font-bold">
+                    仅工作日 (周一至周五)
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                可自定义画布宽度、拟物实体风格、多维度数据统计以及是否附带详细行程费用清单
+                支持 PNG / JPEG / SVG / 独立 HTML 网页格式导出，支持工作日视图、拟物桌历与完整报销附表
               </p>
             </div>
           </div>
@@ -156,10 +456,10 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         {/* Export Controls Toolbar */}
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-          {/* Row 1: Date & Format Options */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Row 1: Target Month, Canvas Width, Format Selector */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             {/* Target Date */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">目标月份:</span>
               
@@ -185,7 +485,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Canvas Width Selection */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Maximize2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">画布宽度:</span>
               <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
@@ -211,7 +511,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Export Format Selector Pills */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 flex-wrap">
               <button
                 type="button"
                 onClick={() => setExportFormat('png')}
@@ -250,10 +550,24 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <FileCode className="w-3.5 h-3.5" />
                 <span>SVG</span>
               </button>
+
+              {/* Requirement 4: HTML Export Format */}
+              <button
+                type="button"
+                onClick={() => setExportFormat('html')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  exportFormat === 'html'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <Code className="w-3.5 h-3.5" />
+                <span>HTML 网页</span>
+              </button>
             </div>
           </div>
 
-          {/* Row 2: Theme Selection & Attached Lists Settings */}
+          {/* Row 2: Theme Selection & Filter Checkboxes */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
             {/* Style / Theme selector */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -281,8 +595,22 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Attachment checkboxes */}
-            <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+            {/* Checkbox settings */}
+            <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0 flex-wrap">
+              {/* Requirement 5: Workdays Only setting */}
+              <label className="flex items-center gap-2 cursor-pointer p-1.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-900 dark:text-sky-200 hover:bg-sky-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={workdaysOnly}
+                  onChange={(e) => setWorkdaysOnly(e.target.checked)}
+                  className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
+                />
+                <span className="flex items-center gap-1">
+                  <Briefcase className="w-3.5 h-3.5 text-sky-600" />
+                  <span>只导出工作日 (周一至周五)</span>
+                </span>
+              </label>
+
               <label className="flex items-center gap-2 cursor-pointer hover:text-emerald-600 transition-colors">
                 <input
                   type="checkbox"
@@ -317,7 +645,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
             <span>实时渲染导出预览 (全高不截断):</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-              渲染尺寸: {canvasWidth}px x 动态自适应高度
+              渲染尺寸: {canvasWidth}px x 动态自适应高度 {workdaysOnly ? '(5列工作日)' : '(7列完整周)'}
             </span>
           </div>
 
@@ -350,7 +678,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   </div>
                   <div>
                     <h2 className={`text-2xl font-black tracking-tight flex items-center gap-3 ${isSkeuomorphic ? 'font-serif text-[#472d17]' : ''}`}>
-                      <span>{exportYear} 年 {exportMonth} 月差旅记账与核算日历</span>
+                      <span>{exportYear} 年 {exportMonth} 月差旅记账与核算日历 {workdaysOnly ? '(工作日)' : ''}</span>
                     </h2>
                     <p className="text-[11px] text-slate-500 font-mono mt-0.5">
                       Smart Travel Calendar Ledger • 生成日期: {new Date().toISOString().split('T')[0]}
@@ -385,17 +713,17 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* Export Weekday Header Bar */}
-              <div className={`grid grid-cols-7 border-b ${themeObj.weekdayHeaderBorder} ${themeObj.weekdayHeaderBg} text-center py-2.5 text-xs font-black ${themeObj.weekdayTextColor} rounded-xl shadow-2xs`}>
+              {/* Export Weekday Header Bar (5 cols if workdaysOnly, else 7 cols) */}
+              <div className={`grid ${workdaysOnly ? 'grid-cols-5' : 'grid-cols-7'} border-b ${themeObj.weekdayHeaderBorder} ${themeObj.weekdayHeaderBg} text-center py-2.5 text-xs font-black ${themeObj.weekdayTextColor} rounded-xl shadow-2xs`}>
                 {WEEKDAYS.map((day, idx) => (
-                  <div key={`exp-wd-${idx}`} className={idx >= 5 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : ''}>
+                  <div key={`exp-wd-${idx}`} className={!workdaysOnly && idx >= 5 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : ''}>
                     {day}
                   </div>
                 ))}
               </div>
 
-              {/* Export Days Grid - Minimal Dynamic Cell Heights */}
-              <div className={`grid grid-cols-7 divide-x divide-y border rounded-xl overflow-hidden ${
+              {/* Export Days Grid - 5 or 7 cols with Minimal Dynamic Cell Heights */}
+              <div className={`grid ${workdaysOnly ? 'grid-cols-5' : 'grid-cols-7'} divide-x divide-y border rounded-xl overflow-hidden ${
                 isSkeuomorphic
                   ? 'divide-[#dcd0b9] border-[#cfbe9d] bg-[#fdfbf7]'
                   : 'divide-slate-100 dark:divide-slate-800 border-slate-100 dark:border-slate-800'
@@ -411,7 +739,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   return (
                     <div
                       key={`exp-cell-${cell.dateStr}-${idx}`}
-                      className={`min-h-[75px] p-2 flex flex-col justify-between transition-colors ${
+                      className={`min-h-[75px] p-2.5 flex flex-col justify-between transition-colors ${
                         !cell.isCurrentMonth
                           ? isSkeuomorphic
                             ? 'bg-[#f0e8d8]/60 text-slate-400'
@@ -622,7 +950,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   ? 'bg-[#eedebd] border-[#cbb895] text-[#523d29]'
                   : 'bg-slate-100/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               }`}>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-6 flex-wrap">
                   <span>填报人: ______________</span>
                   <span>部门审核: ______________</span>
                   <span>财务复核: ______________</span>
@@ -665,7 +993,7 @@ export const CalendarExportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>立即导出 {exportFormat.toUpperCase()} 高清文件</span>
+                <span>立即导出 {exportFormat.toUpperCase()} {exportFormat === 'html' ? '网页文件' : '高清文件'}</span>
               </>
             )}
           </button>

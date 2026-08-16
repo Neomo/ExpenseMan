@@ -54,13 +54,12 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar />
 
-      {/* Widescreen Main Container */}
-      <div className="max-w-[1920px] w-full mx-auto flex-1 flex flex-col md:flex-row pb-16 md:pb-8 px-2 sm:px-4 lg:px-6">
-        {/* Desktop Sidebar */}
+      <div className="w-full flex-1 flex flex-col md:flex-row pb-16 md:pb-8">
+        {/* Desktop Fixed Left Sidebar */}
         <Sidebar />
 
         {/* Dynamic Tab Content Area */}
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0 w-full">
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'list' && <ItemListView />}
           {activeTab === 'map' && <MapView />}
