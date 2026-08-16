@@ -151,11 +151,23 @@ export interface CalendarDisplayConfig {
   theme: CalendarThemeKey;        // 日历主题
 }
 
+export interface CalendarExportSettings {
+  canvasWidth?: 1100 | 1350 | 1600;
+  theme?: CalendarThemeKey;
+  includeTripList?: boolean;
+  includeExpenseList?: boolean;
+  workdaysOnly?: boolean;
+  exportFormat?: 'png' | 'jpeg' | 'svg' | 'html';
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   currencySymbol: string;
   ocrConfig?: OcrConfig;
   calendarDisplayConfig?: CalendarDisplayConfig;
+  calendarExportSettings?: CalendarExportSettings;
+  allowanceConfig?: AllowanceConfig;
+  cityStations?: any[];
 }
 
 export type ViewMode = 'month' | 'week' | 'day';
@@ -174,8 +186,9 @@ export interface ReportFilter {
 export interface BackupData {
   version: string;
   exportTime: string;
-  trips: TripItem[];
-  expenses: ExpenseItem[];
-  customCategories: CustomCategory[];
-  settings: AppSettings;
+  backupType?: 'data_only' | 'full';
+  trips?: TripItem[];
+  expenses?: ExpenseItem[];
+  customCategories?: CustomCategory[];
+  settings?: AppSettings;
 }

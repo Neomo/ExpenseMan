@@ -98,7 +98,7 @@ interface AppState {
   deleteCustomCategory: (id: string) => Promise<void>;
 
   // Import / Export / Backup
-  exportData: () => Promise<BackupData>;
+  exportData: (type?: 'data_only' | 'full') => Promise<BackupData>;
   importData: (data: BackupData, mode: 'override' | 'merge') => Promise<void>;
   clearAllData: () => Promise<void>;
   seedDemoData: () => Promise<void>;
@@ -677,8 +677,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().showToast('已删除分类', 'info');
   },
 
-  exportData: async () => {
-    return db.exportBackupData();
+  exportData: async (type: 'data_only' | 'full' = 'full') => {
+    return db.exportBackupData(type);
   },
 
   importData: async (data, mode) => {
@@ -689,6 +689,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       const expenses = await db.getAllExpenses();
       const customCategories = await db.getAllCustomCategories();
       const storedTheme = await db.getSetting<'light' | 'dark'>('theme', 'light');
+      const storedOcrConfig = await db.getSetting<OcrConfig>('ocrConfig', { provider: 'local_paddle' });
+      const storedCalendarDisplayConfig = await db.getSetting<CalendarDisplayConfig>(
+        'calendarDisplayConfig',
+        DEFAULT_CALENDAR_DISPLAY_CONFIG
+      );
+      const storedAllowanceConfig = await db.getSetting<AllowanceConfig>(
+        'allowanceConfig',
+        DEFAULT_ALLOWANCE_CONFIG
+      );
+      const storedCityStations = await db.getCityStations();
 
       if (storedTheme === 'dark') {
         document.documentElement.classList.add('dark');
@@ -700,11 +710,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         trips,
         expenses,
         customCategories,
+        cityStations: storedCityStations,
         theme: storedTheme,
+        ocrConfig: storedOcrConfig,
+        calendarDisplayConfig: { ...DEFAULT_CALENDAR_DISPLAY_CONFIG, ...storedCalendarDisplayConfig },
+        allowanceConfig: { ...DEFAULT_ALLOWANCE_CONFIG, ...storedAllowanceConfig },
         isLoading: false,
       });
       await get().generateTripAllowances(false);
-      get().showToast(`数据导入成功！导入 ${res.tripsImported} 条行程和 ${res.expensesImported} 条费用`, 'success');
+      
+      const settingsMsg = res.settingsRestored ? '，并已恢复所有用户偏好及系统配置' : '';
+      get().showToast(`数据导入成功！已导入 ${res.tripsImported} 条行程和 ${res.expensesImported} 条费用${settingsMsg}`, 'success');
     } catch (err) {
       console.error('Import failed:', err);
       set({ isLoading: false });

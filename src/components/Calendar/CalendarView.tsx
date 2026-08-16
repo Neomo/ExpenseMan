@@ -54,7 +54,7 @@ export const CalendarView: React.FC = () => {
           {currentViewMode === 'day' && <DayView />}
         </div>
 
-        <div className="w-full lg:w-[380px] xl:w-[430px] 2xl:w-[480px] shrink-0 sticky top-24">
+        <div className="w-full lg:w-[280px] xl:w-[320px] 2xl:w-[360px] shrink-0 sticky top-20">
           <CalendarRightPanel />
         </div>
       </div>

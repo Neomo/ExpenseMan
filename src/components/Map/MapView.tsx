@@ -35,6 +35,40 @@ interface ResolvedTrip {
   isSameCity: boolean;
 }
 
+// Helper to classify transport types
+const isTrainTransport = (transportStr?: string): boolean => {
+  if (!transportStr) return false;
+  const t = transportStr.trim().toLowerCase();
+  return (
+    t.includes('火车') ||
+    t.includes('高铁') ||
+    t.includes('动车') ||
+    t.includes('城际') ||
+    t.includes('列车') ||
+    t.includes('普快') ||
+    t.includes('特快') ||
+    t.includes('直达') ||
+    t.includes('train') ||
+    t.includes('rail') ||
+    t.includes('bullet')
+  );
+};
+
+const isFlightTransport = (transportStr?: string): boolean => {
+  if (!transportStr) return false;
+  const t = transportStr.trim().toLowerCase();
+  return (
+    t.includes('飞机') ||
+    t.includes('航班') ||
+    t.includes('机票') ||
+    t.includes('民航') ||
+    t.includes('客机') ||
+    t.includes('flight') ||
+    t.includes('plane') ||
+    t.includes('air')
+  );
+};
+
 export const MapView: React.FC = () => {
   const { trips, cityStations, openTripModal } = useAppStore();
 
@@ -92,10 +126,13 @@ export const MapView: React.FC = () => {
   const filteredResolvedTrips = useMemo(() => {
     return resolvedTrips
       .filter(({ trip, originMatch, destMatch }) => {
-        // Transport filter
-        if (activeTransportFilter !== 'all' && trip.transport !== activeTransportFilter) {
-          return false;
+        // Transport filter: train or flight
+        if (activeTransportFilter === 'train' || activeTransportFilter === '火车' || activeTransportFilter === '高铁') {
+          if (!isTrainTransport(trip.transport)) return false;
+        } else if (activeTransportFilter === 'flight' || activeTransportFilter === '飞机') {
+          if (!isFlightTransport(trip.transport)) return false;
         }
+
         // Year filter
         if (activeYearFilter !== 'all' && !trip.date.startsWith(activeYearFilter)) {
           return false;
@@ -456,11 +493,9 @@ export const MapView: React.FC = () => {
               onChange={(e) => setActiveTransportFilter(e.target.value)}
               className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
             >
-              <option value="all">🚄 所有交通类型</option>
-              <option value="火车">🚆 火车/高铁</option>
-              <option value="飞机">✈️ 飞机航班</option>
-              <option value="的士">🚕 的士/网约车</option>
-              <option value="大巴">🚌 汽车大巴</option>
+              <option value="all">🚄✈️ 全部交通类型</option>
+              <option value="train">🚆 火车/高铁</option>
+              <option value="flight">✈️ 飞机航班</option>
             </select>
 
             {/* Year Filter */}

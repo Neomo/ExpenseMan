@@ -324,72 +324,212 @@ export function exportReportToExcel(data: ReportExportData): void {
 
 // 3. Export SVG Vector Graphic
 export function exportReportToSVG(data: ReportExportData, categoryData: { name: string; value: number }[]): void {
-  const svgWidth = 800;
-  const svgHeight = 600;
+  const svgWidth = 840;
+  const escapeXml = (unsafe: string) => {
+    return (unsafe || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
 
-  // Build an SVG infographic
   const total = data.grandTotal || 1;
 
+  // Build category bars
   let categoryBars = '';
   let yOffset = 260;
 
-  categoryData.forEach((item, index) => {
-    const pct = ((item.value / total) * 100).toFixed(1);
-    const barWidth = Math.max(10, Math.min(400, (item.value / total) * 400));
-    const colors = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#2563eb'];
-    const color = colors[index % colors.length];
+  if (categoryData.length > 0) {
+    categoryData.forEach((item, index) => {
+      const pct = ((item.value / total) * 100).toFixed(1);
+      const barWidth = Math.max(10, Math.min(420, (item.value / total) * 420));
+      const colors = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#0284c7', '#0891b2'];
+      const color = colors[index % colors.length];
 
+      categoryBars += `
+        <g transform="translate(40, ${yOffset})">
+          <text x="0" y="15" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#334155">${escapeXml(item.name)}</text>
+          <rect x="140" y="2" width="420" height="18" rx="4" fill="#f1f5f9" />
+          <rect x="140" y="2" width="${barWidth}" height="18" rx="4" fill="${color}" />
+          <text x="575" y="16" font-family="ui-monospace, monospace" font-size="13" font-weight="bold" fill="#0f172a">¥ ${item.value.toFixed(2)} (${pct}%)</text>
+        </g>
+      `;
+      yOffset += 32;
+    });
+  } else {
     categoryBars += `
+      <text x="40" y="${yOffset + 15}" font-family="sans-serif" font-size="13" fill="#94a3b8">暂无分类统计数据</text>
+    `;
+    yOffset += 32;
+  }
+
+  yOffset += 25;
+
+  // Group trips and expenses by Date
+  const dateGroups: Record<string, { trips: TripItem[]; expenses: ExpenseItem[]; dayTotal: number }> = {};
+
+  if (data.showTrips && data.trips) {
+    data.trips.forEach((t) => {
+      if (!dateGroups[t.date]) {
+        dateGroups[t.date] = { trips: [], expenses: [], dayTotal: 0 };
+      }
+      dateGroups[t.date].trips.push(t);
+      dateGroups[t.date].dayTotal += t.amount;
+    });
+  }
+
+  if (data.showExpenses && data.expenses) {
+    data.expenses.forEach((e) => {
+      if (!dateGroups[e.date]) {
+        dateGroups[e.date] = { trips: [], expenses: [], dayTotal: 0 };
+      }
+      dateGroups[e.date].expenses.push(e);
+      dateGroups[e.date].dayTotal += e.amount;
+    });
+  }
+
+  const sortedDates = Object.keys(dateGroups).sort((a, b) => a.localeCompare(b));
+
+  let groupedDetailsSvg = '';
+
+  if (sortedDates.length > 0) {
+    groupedDetailsSvg += `
+      <!-- Detailed List Section Title -->
       <g transform="translate(40, ${yOffset})">
-        <text x="0" y="15" font-family="sans-serif" font-size="14" fill="#374151">${item.name}</text>
-        <rect x="120" y="2" width="400" height="18" rx="4" fill="#f3f4f6" />
-        <rect x="120" y="2" width="${barWidth}" height="18" rx="4" fill="${color}" />
-        <text x="535" y="16" font-family="sans-serif" font-size="14" font-weight="bold" fill="#111827">¥ ${item.value.toFixed(2)} (${pct}%)</text>
+        <rect x="0" y="-18" width="4" height="20" rx="2" fill="#2563eb" />
+        <text x="14" y="-2" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">
+          行程及费用明细列表 (按日期分组)
+        </text>
       </g>
     `;
-    yOffset += 36;
-  });
+    yOffset += 20;
 
-  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${Math.max(svgHeight, yOffset + 60)}" width="${svgWidth}" height="${Math.max(svgHeight, yOffset + 60)}">
+    sortedDates.forEach((dateKey) => {
+      const group = dateGroups[dateKey];
+      const chineseDate = formatChineseDate(dateKey);
+
+      // Date Group Header
+      groupedDetailsSvg += `
+        <g transform="translate(40, ${yOffset})">
+          <rect x="0" y="0" width="${svgWidth - 80}" height="32" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <rect x="8" y="6" width="6" height="20" rx="3" fill="#3b82f6" />
+          <text x="22" y="21" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">
+            📅 ${escapeXml(dateKey)} (${escapeXml(chineseDate)})
+          </text>
+          <text x="${svgWidth - 100}" y="21" font-family="ui-monospace, monospace" font-size="13" font-weight="bold" fill="#2563eb" text-anchor="end">
+            当日小计: ¥ ${group.dayTotal.toFixed(2)}
+          </text>
+        </g>
+      `;
+      yOffset += 40;
+
+      // Group Trips
+      group.trips.forEach((t) => {
+        const route = `${t.origin || '起点'} ➔ ${t.destination || '终点'}`;
+        const trainInfo = t.trainNumber ? `[${t.trainNumber}]` : '';
+        const timeInfo = t.startTime ? `${t.startTime}` : '';
+        const remarks = t.remarks ? ` - ${t.remarks}` : '';
+        const desc = `${escapeXml(t.transport)} ${escapeXml(trainInfo)} ${escapeXml(route)} ${timeInfo ? `(${escapeXml(timeInfo)})` : ''}${escapeXml(remarks)}`;
+
+        groupedDetailsSvg += `
+          <g transform="translate(56, ${yOffset})">
+            <circle cx="6" cy="10" r="3" fill="#0284c7" />
+            <text x="18" y="14" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#334155">
+              ✈️ ${desc}
+            </text>
+            <text x="${svgWidth - 100}" y="14" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#0284c7" text-anchor="end">
+              ¥ ${t.amount.toFixed(2)}
+            </text>
+          </g>
+        `;
+        yOffset += 26;
+      });
+
+      // Group Expenses
+      group.expenses.forEach((e) => {
+        const desc = `${escapeXml(e.category)}${e.description ? `: ${escapeXml(e.description)}` : ''}`;
+
+        groupedDetailsSvg += `
+          <g transform="translate(56, ${yOffset})">
+            <circle cx="6" cy="10" r="3" fill="#059669" />
+            <text x="18" y="14" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#334155">
+              🪙 ${desc}
+            </text>
+            <text x="${svgWidth - 100}" y="14" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#059669" text-anchor="end">
+              ¥ ${e.amount.toFixed(2)}
+            </text>
+          </g>
+        `;
+        yOffset += 26;
+      });
+
+      yOffset += 10;
+    });
+  }
+
+  const finalHeight = Math.max(600, yOffset + 50);
+
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${finalHeight}" width="${svgWidth}" height="${finalHeight}">
+    <defs>
+      <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#eff6ff" />
+        <stop offset="100%" stop-color="#dbeafe" />
+      </linearGradient>
+    </defs>
+
     <rect width="100%" height="100%" fill="#ffffff" rx="16" />
-    <rect x="20" y="20" width="${svgWidth - 40}" height="${Math.max(svgHeight, yOffset + 60) - 40}" fill="#f8fafc" rx="12" stroke="#e2e8f0" stroke-width="1.5" />
+    <rect x="16" y="16" width="${svgWidth - 32}" height="${finalHeight - 32}" fill="#f8fafc" rx="14" stroke="#e2e8f0" stroke-width="1.5" />
 
     <!-- Header -->
-    <text x="40" y="65" font-family="sans-serif" font-size="22" font-weight="bold" fill="#0f172a">${data.title} - 费用分布图表</text>
-    <text x="40" y="90" font-family="sans-serif" font-size="13" fill="#64748b">统计区间: ${data.dateRangeText} | 生成时间: ${new Date().toLocaleDateString()}</text>
+    <text x="40" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="#0f172a">${escapeXml(data.title)}</text>
+    <text x="40" y="85" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#64748b">统计区间: ${escapeXml(data.dateRangeText)} | 生成时间: ${new Date().toLocaleDateString()}</text>
 
-    <!-- Cards Summary -->
-    <g transform="translate(40, 115)">
-      <!-- Card 1 -->
-      <rect x="0" y="0" width="220" height="90" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
-      <text x="16" y="32" font-family="sans-serif" font-size="13" fill="#64748b">交通行程费用</text>
-      <text x="16" y="66" font-family="sans-serif" font-size="20" font-weight="bold" fill="#0284c7">¥ ${data.tripSubtotal.toFixed(2)}</text>
+    <!-- Cards Summary (Fixed Overlap Bug with Separate Group Containers) -->
+    <g transform="translate(40, 110)">
+      <!-- Card 1: 交通行程费用 -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="235" height="90" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+        <text x="18" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#64748b">✈️ 交通行程费用</text>
+        <text x="18" y="68" font-family="ui-monospace, monospace" font-size="22" font-weight="bold" fill="#0284c7">¥ ${data.tripSubtotal.toFixed(2)}</text>
+      </g>
 
-      <!-- Card 2 -->
-      <rect x="245" y="0" width="220" height="90" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
-      <text x="16" y="32" font-family="sans-serif" font-size="13" fill="#64748b">其他常规费用</text>
-      <text x="16" y="66" font-family="sans-serif" font-size="20" font-weight="bold" fill="#059669">¥ ${data.expenseSubtotal.toFixed(2)}</text>
+      <!-- Card 2: 其他日常费用 -->
+      <g transform="translate(255, 0)">
+        <rect x="0" y="0" width="235" height="90" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+        <text x="18" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#64748b">🪙 其他日常费用</text>
+        <text x="18" y="68" font-family="ui-monospace, monospace" font-size="22" font-weight="bold" fill="#059669">¥ ${data.expenseSubtotal.toFixed(2)}</text>
+      </g>
 
-      <!-- Card 3 -->
-      <rect x="490" y="0" width="230" height="90" rx="10" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5" />
-      <text x="16" y="32" font-family="sans-serif" font-size="13" fill="#1e40af">总花费合计</text>
-      <text x="16" y="66" font-family="sans-serif" font-size="22" font-weight="bold" fill="#1d4ed8">¥ ${data.grandTotal.toFixed(2)}</text>
+      <!-- Card 3: 总花费合计 -->
+      <g transform="translate(510, 0)">
+        <rect x="0" y="0" width="250" height="90" rx="12" fill="url(#cardGrad)" stroke="#93c5fd" stroke-width="1.5" />
+        <text x="18" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#1e40af">🍃 总花费合计</text>
+        <text x="18" y="68" font-family="ui-monospace, monospace" font-size="24" font-weight="bold" fill="#1d4ed8">¥ ${data.grandTotal.toFixed(2)}</text>
+      </g>
     </g>
 
-    <!-- Section Title -->
-    <text x="40" y="245" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1e293b">费用类别分布明细</text>
+    <!-- Category Section Title -->
+    <g transform="translate(40, 235)">
+      <rect x="0" y="-18" width="4" height="20" rx="2" fill="#059669" />
+      <text x="14" y="-2" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">费用类别分布明细</text>
+    </g>
 
     <!-- Category Bars -->
     ${categoryBars}
 
-    <text x="40" y="${yOffset + 40}" font-family="sans-serif" font-size="12" fill="#94a3b8">差旅行程记录 Web 应用 矢量信息图表</text>
+    <!-- Detailed Grouped List -->
+    ${groupedDetailsSvg}
+
+    <!-- Footer -->
+    <text x="40" y="${finalHeight - 24}" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94a3b8">差旅行程记录 Web 应用 · 矢量信息图表与明细数据</text>
   </svg>`;
 
   const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `差旅费用矢量图表_${data.dateRangeText.replace(/\s+/g, '_')}.svg`;
+  a.download = `差旅费用明细图表_${data.dateRangeText.replace(/\s+/g, '_')}.svg`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

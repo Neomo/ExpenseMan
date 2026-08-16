@@ -31,6 +31,7 @@ import { CityStationManager } from './CityStationManager';
 const backupDataSchema = z.object({
   version: z.string().optional(),
   exportTime: z.string().optional(),
+  backupType: z.enum(['data_only', 'full']).optional(),
   trips: z.array(
     z.object({
       id: z.string(),
@@ -47,6 +48,14 @@ const backupDataSchema = z.object({
       amount: z.number(),
     })
   ).optional(),
+  customCategories: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      type: z.string(),
+    })
+  ).optional(),
+  settings: z.record(z.string(), z.any()).optional(),
 });
 
 export const DataSettingsView: React.FC = () => {
@@ -98,21 +107,41 @@ export const DataSettingsView: React.FC = () => {
   const transportCategories = customCategories.filter((c) => c.type === 'transport');
   const expenseCategories = customCategories.filter((c) => c.type === 'expense');
 
-  // Handle Export JSON
-  const handleExportJSON = async () => {
+  // Handle Export Data Only
+  const handleExportDataOnly = async () => {
     try {
-      const data = await exportData();
+      const data = await exportData('data_only');
       const jsonStr = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `差旅备份数据_${new Date().toISOString().substring(0, 10)}.json`;
+      a.download = `差旅行程与费用数据_${new Date().toISOString().substring(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('JSON 数据备份已成功导出', 'success');
+      showToast('行程及费用数据已成功导出', 'success');
+    } catch (err) {
+      showToast('导出数据失败', 'error');
+    }
+  };
+
+  // Handle Export Full Backup with all settings
+  const handleExportFull = async () => {
+    try {
+      const data = await exportData('full');
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `差旅系统完整配置备份_${new Date().toISOString().substring(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('全量数据与用户偏好设置已成功打包导出', 'success');
     } catch (err) {
       showToast('导出数据失败', 'error');
     }
@@ -355,29 +384,49 @@ export const DataSettingsView: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            您可以随时导出备份 JSON 文件以保存全量数据，或在新设备导入 JSON 文件恢复历史差旅账单。
+            支持仅导出行程与费用明细（方便跨用户数据迁移与统计），或导出包含日历视觉主题、高级导出配置、OCR 与车站数据库等全部用户偏好的完整备份。
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
-              id="settings-export-json-btn"
-              onClick={handleExportJSON}
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-300 transition-all flex flex-col items-center justify-center text-center gap-2"
+              id="settings-export-data-only-btn"
+              onClick={handleExportDataOnly}
+              className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 transition-all flex flex-col items-center justify-center text-center gap-1.5"
             >
-              <Download className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                导出全量 JSON 备份
+              <Download className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                仅导出行程及费用
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                纯业务数据/轻量归档
+              </span>
+            </button>
+
+            <button
+              id="settings-export-full-btn"
+              onClick={handleExportFull}
+              className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100/70 hover:border-blue-400 transition-all flex flex-col items-center justify-center text-center gap-1.5 shadow-xs"
+            >
+              <FileJson className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <span className="text-xs font-bold text-blue-900 dark:text-blue-200">
+                导出完整备份 (含设置)
+              </span>
+              <span className="text-[10px] text-blue-600/80 dark:text-blue-300/80">
+                含日历主题/导出/OCR等
               </span>
             </button>
 
             <button
               id="settings-import-json-btn"
               onClick={() => fileInputRef.current?.click()}
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 transition-all flex flex-col items-center justify-center text-center gap-2"
+              className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 transition-all flex flex-col items-center justify-center text-center gap-1.5"
             >
-              <Upload className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                导入 JSON 文件
+              <Upload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                导入 JSON 备份
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                自动识别数据与设置
               </span>
             </button>
 
@@ -611,17 +660,54 @@ export const DataSettingsView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60">
+              <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 shrink-0">
                 <FileJson className="w-6 h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 dark:text-slate-100">
-                  选择 JSON 导入方式
+                  选择 JSON 备份导入方式
                 </h3>
-                <p className="text-xs text-slate-500">
-                  发现文件包含 {pendingImportData?.trips?.length || 0} 条行程, {pendingImportData?.expenses?.length || 0} 条费用
-                </p>
+                <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  {pendingImportData?.backupType === 'full' || pendingImportData?.settings
+                    ? '🗂️ 完整备份 (含用户设置偏好)'
+                    : '📦 业务数据备份 (行程与费用)'}
+                </span>
               </div>
+            </div>
+
+            {/* Content summary breakdown */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1.5">
+              <div className="font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between">
+                <span>备份文件解析明细：</span>
+                <span className="text-[11px] font-normal text-slate-400">
+                  {pendingImportData?.exportTime ? new Date(pendingImportData.exportTime).toLocaleDateString() : '未知时间'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300 pt-1">
+                <div className="flex items-center gap-1">
+                  <span>🚆 行程记录:</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">{pendingImportData?.trips?.length || 0} 条</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>🪙 费用记录:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{pendingImportData?.expenses?.length || 0} 条</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>🏷️ 分类扩充:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{pendingImportData?.customCategories?.length || 0} 项</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>⚙️ 用户偏好设置:</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                    {pendingImportData?.settings ? '包含' : '无'}
+                  </span>
+                </div>
+              </div>
+              {pendingImportData?.settings && (
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700/60">
+                  ✅ 包含：日历视觉与显示、高级导出参数、出差补贴与本地常驻地、OCR 密钥及城市车站库等设置
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -635,10 +721,10 @@ export const DataSettingsView: React.FC = () => {
                 className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:border-emerald-300 text-left transition-all group"
               >
                 <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 group-hover:text-emerald-600">
-                  🔀 合并现有数据 (推荐)
+                  🔀 追加合并 (推荐)
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  保留当前已有的记录，并将导入文件中的新数据追加合并进来
+                  保留当前已有的记录，并将导入文件中的新数据追加合并，更新系统配置
                 </div>
               </button>
 
@@ -648,10 +734,10 @@ export const DataSettingsView: React.FC = () => {
                 className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:border-rose-300 text-left transition-all group"
               >
                 <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 group-hover:text-rose-600">
-                  ⚠️ 覆盖现有数据
+                  ⚠️ 完全覆盖替换
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  清空当前本地 IndexedDB 数据，完全替换为导入文件中的内容
+                  清空当前本地 IndexedDB 数据，完全替换为导入文件中的内容与配置
                 </div>
               </button>
             </div>

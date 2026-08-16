@@ -170,22 +170,46 @@ export async function saveCityStations(records: CityStationRecord[]): Promise<vo
 }
 
 // Import / Export Operations
-export async function exportBackupData(): Promise<BackupData> {
+export async function exportBackupData(type: 'data_only' | 'full' = 'full'): Promise<BackupData> {
   const db = await getDB();
   const trips = await db.getAll('trips');
   const expenses = await db.getAll('expenses');
   const customCategories = await db.getAll('customCategories');
+
+  if (type === 'data_only') {
+    return {
+      version: '1.0',
+      exportTime: new Date().toISOString(),
+      backupType: 'data_only',
+      trips,
+      expenses,
+      customCategories,
+    };
+  }
+
+  // Full backup: include all settings
   const theme = await getSetting<'light' | 'dark'>('theme', 'light');
+  const calendarDisplayConfig = await getSetting('calendarDisplayConfig', undefined);
+  const calendarExportSettings = await getSetting('calendarExportSettings', undefined);
+  const allowanceConfig = await getSetting('allowanceConfig', undefined);
+  const ocrConfig = await getSetting('ocrConfig', undefined);
+  const cityStations = await getSetting('cityStations', DEFAULT_CITY_STATION_RECORDS);
 
   return {
     version: '1.0',
     exportTime: new Date().toISOString(),
+    backupType: 'full',
     trips,
     expenses,
     customCategories,
     settings: {
       theme,
       currencySymbol: '¥',
+      calendarDisplayConfig,
+      calendarExportSettings,
+      allowanceConfig,
+      ocrConfig,
+      cityStations,
     },
   };
 }
@@ -193,11 +217,11 @@ export async function exportBackupData(): Promise<BackupData> {
 export async function importBackupData(
   data: BackupData,
   mode: 'override' | 'merge'
-): Promise<{ tripsImported: number; expensesImported: number }> {
+): Promise<{ tripsImported: number; expensesImported: number; settingsRestored: boolean }> {
   const db = await getDB();
 
   if (mode === 'override') {
-    // Clear all existing stores
+    // Clear all existing data stores
     const tx = db.transaction(['trips', 'expenses', 'customCategories'], 'readwrite');
     await tx.objectStore('trips').clear();
     await tx.objectStore('expenses').clear();
@@ -237,9 +261,33 @@ export async function importBackupData(
 
   await tx.done;
 
-  if (data.settings?.theme) {
-    await saveSetting('theme', data.settings.theme);
+  let settingsRestored = false;
+  if (data.settings) {
+    if (data.settings.theme) {
+      await saveSetting('theme', data.settings.theme);
+      settingsRestored = true;
+    }
+    if (data.settings.calendarDisplayConfig) {
+      await saveSetting('calendarDisplayConfig', data.settings.calendarDisplayConfig);
+      settingsRestored = true;
+    }
+    if (data.settings.calendarExportSettings) {
+      await saveSetting('calendarExportSettings', data.settings.calendarExportSettings);
+      settingsRestored = true;
+    }
+    if (data.settings.allowanceConfig) {
+      await saveSetting('allowanceConfig', data.settings.allowanceConfig);
+      settingsRestored = true;
+    }
+    if (data.settings.ocrConfig) {
+      await saveSetting('ocrConfig', data.settings.ocrConfig);
+      settingsRestored = true;
+    }
+    if (data.settings.cityStations && Array.isArray(data.settings.cityStations)) {
+      await saveSetting('cityStations', data.settings.cityStations);
+      settingsRestored = true;
+    }
   }
 
-  return { tripsImported: tripsCount, expensesImported: expensesCount };
+  return { tripsImported: tripsCount, expensesImported: expensesCount, settingsRestored };
 }
